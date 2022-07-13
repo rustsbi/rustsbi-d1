@@ -1,3 +1,5 @@
 [alias]
 xtask = "run --package xtask --release --"
 asm = "xtask asm"
+boot = "xtask boot"
+debug = "xtask debug"

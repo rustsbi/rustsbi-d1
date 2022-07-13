@@ -51,11 +51,21 @@ impl Shl<usize> for Out {
 
     #[inline]
     fn shl(mut self, mut rhs: usize) -> Self::Output {
-        while rhs > 0 {
-            self = self << ((rhs % 10) as u8 + b'0');
-            rhs /= 10;
+        if rhs == 0 {
+            self << b'0'
+        } else {
+            let mut bits = 1;
+            while bits < rhs {
+                bits *= 10;
+            }
+            bits /= 10;
+            while bits > 0 {
+                self = self << ((rhs / bits) as u8 + b'0');
+                rhs %= bits;
+                bits /= 10;
+            }
+            self
         }
-        self
     }
 }
 
@@ -63,22 +73,23 @@ impl Shl<Hex> for Out {
     type Output = Self;
 
     fn shl(mut self, rhs: Hex) -> Self::Output {
-        let mut num = match rhs {
+        let num = match rhs {
             Hex::Raw(n) => n,
             Hex::Fmt(n) => {
                 self = self << "0x";
                 n
             }
         };
-        while num > 0 {
-            let x = num % 16;
-            if x < 10 {
-                self = self << (x as u8 + b'0');
-            } else {
-                self = self << (x as u8 + b'a');
-            }
-            num /= 16;
+        if num == 0 {
+            self << b'0'
+        } else {
+            (0..16)
+                .rev()
+                .map(|bits| ((num >> (bits * 4)) & 0xf) as u8)
+                .skip_while(|x| *x == 0)
+                .fold(self, |out, x| {
+                    out << x + if x < 10 { b'0' } else { b'a' - 10 }
+                })
         }
-        self
     }
 }

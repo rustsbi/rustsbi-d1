@@ -166,6 +166,8 @@ extern "C" fn main() -> usize {
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
 
+    let _ = Out << "ready for flash reading" << Endl;
+
     let p = Peripherals::take().unwrap();
     let clocks = Clocks {
         psi: 600_000_000.hz(),
@@ -215,13 +217,13 @@ extern "C" fn main() -> usize {
         << " bytes"
         << Endl;
 
-    let total_size = if payload_size > 0 {
-        2 * 1024 * 1024 + payload_size
-    } else {
-        main.length
-    };
-    let ddr_buffer = unsafe { core::slice::from_raw_parts_mut(RAM_BASE as _, total_size as _) };
-    flash.copy_into(main.offset as _, ddr_buffer);
+    // let total_size = if payload_size > 0 {
+    //     2 * 1024 * 1024 + payload_size
+    // } else {
+    //     main.length
+    // };
+    // let ddr_buffer = unsafe { core::slice::from_raw_parts_mut(RAM_BASE as _, total_size as _) };
+    // flash.copy_into(main.offset as _, ddr_buffer);
 
     let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(RAM_BASE) << Endl;
 
