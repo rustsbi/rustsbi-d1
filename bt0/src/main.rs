@@ -8,6 +8,8 @@ mod magic;
 
 use core::{arch::asm, panic::PanicInfo};
 
+use rofs::PayloadMeta;
+
 #[naked]
 #[no_mangle]
 #[link_section = ".head.text"]
@@ -15,7 +17,7 @@ unsafe extern "C" fn head_jump() -> ! {
     asm!(
         ".option push",
         ".option rvc",
-        "c.j    0x68", // 0x60: eGON.BT0 header; 0x08: FlashHead
+        "c.j    0x60", // 0x60: eGON.BT0 header; 0x08: FlashHead
         ".option pop",
         options(noreturn)
     )
@@ -36,19 +38,6 @@ static EGON_HEAD: EgonHead = EgonHead {
     dram_size: 0,
     boot_media: 0,
     string_pool: [0; 13],
-};
-
-#[link_section = ".head.main"]
-static MAIN_STAGE_HEAD: MainStageHead = MainStageHead {
-    offset: 0,
-    length: 0,
-};
-
-// **NOTICE** 必须 mut，因为会被汇编修改
-#[link_section = ".bss.uninit"]
-static mut MAIN_STAGE_HEAD_COPY: MainStageHead = MainStageHead {
-    offset: 0,
-    length: 0,
 };
 
 #[naked]
@@ -75,15 +64,7 @@ unsafe extern "C" fn start() -> ! {
     asm!(
         // 关中断
         "   csrw   mie, zero",
-        // 拷贝 main 阶段信息
-        "
-            la   t0, {main_head}
-            la   t1, {main_head_copy}
-
-            ld   t0, 0(t0)
-            sd   t0, 0(t1)
-        ",
-        // 拷贝魔法二进制前 256 字节到 sram 开始位置
+        // 拷贝魔法二进制前 128 字节到 sram 开始位置
         "
             la   t0, {head}
             la   t1, {magic_head}
@@ -131,9 +112,6 @@ unsafe extern "C" fn start() -> ! {
             fence.i
             jr   a0
         ",
-        main_head      = sym MAIN_STAGE_HEAD,
-        main_head_copy = sym MAIN_STAGE_HEAD_COPY,
-
         head       =   sym head_jump,
         magic_head =   sym magic::HEAD,
         magic_tail =   sym magic::TAIL,
@@ -158,15 +136,14 @@ extern "C" fn main() -> usize {
     };
     use logging::*;
 
-    const RAM_BASE: usize = 0x4000_0000;
+    const SRAM_SIZE: usize = 32 * 1024;
+    const DRAM_BASE: usize = 0x4000_0000;
 
     extern "C" {
         static mut sbss: u64;
         static mut ebss: u64;
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
-
-    let _ = Out << "ready for flash reading" << Endl;
 
     let p = Peripherals::take().unwrap();
     let clocks = Clocks {
@@ -191,43 +168,79 @@ extern "C" fn main() -> usize {
     );
     let mut flash = SpiNand::new(spi);
 
-    let _ = Out << "NAND flash:";
+    let _ = Out << "oreboot 🦀" << Endl << "NAND flash:";
     for c in flash.read_id() {
         let _ = Out << b' ' << Hex::Raw(c as _);
     }
     let _ = Out << Endl;
 
-    let main = unsafe { MAIN_STAGE_HEAD_COPY };
+    let mut meta = PayloadMeta::ZERO;
+    let buf = unsafe {
+        core::slice::from_raw_parts_mut(meta.0.as_mut_ptr() as *mut u8, PayloadMeta::SIZE_IN_BYTES)
+    };
+    flash.copy_into(SRAM_SIZE as _, buf);
 
-    let mut payload_size_buf = [0u8; 8];
-    flash.copy_into(main.offset as _, &mut payload_size_buf);
-    let [_, _, _, _, a, b, c, d] = payload_size_buf;
-    let payload_size = u32::from_le_bytes([a, b, c, d]);
+    let mut count = 0usize;
+    for entry in &meta.0 {
+        if (1..u32::MAX).contains(&entry.size) {
+            count += 1;
+            let _ = Out
+                << "payload "
+                << count
+                << " of "
+                << (entry.size as usize)
+                << " bytes to "
+                << Hex::Fmt(entry.target_offset as _)
+                << Endl;
+        }
+    }
 
-    let _ = Out
-        << "oreboot 🦀"
-        << Endl
-        << "main stage: "
-        << (main.length as usize)
-        << " bytes at "
-        << Hex::Fmt(main.offset as _)
-        << Endl
-        << "payload:    "
-        << (payload_size as usize)
-        << " bytes"
-        << Endl;
+    if count == 0 {
+        let _ = Out << "no payload" << Endl << "[>>";
+        for _ in 0..36 {
+            let _ = Out << b' ';
+        }
+        let _ = Out << b']' << 8u8;
 
-    // let total_size = if payload_size > 0 {
-    //     2 * 1024 * 1024 + payload_size
-    // } else {
-    //     main.length
-    // };
-    // let ddr_buffer = unsafe { core::slice::from_raw_parts_mut(RAM_BASE as _, total_size as _) };
-    // flash.copy_into(main.offset as _, ddr_buffer);
+        let mut dir = true;
+        loop {
+            if dir {
+                if count == 36 {
+                    dir = false;
+                } else {
+                    count += 1;
+                }
+            } else {
+                if count == 0 {
+                    dir = true;
+                } else {
+                    count -= 1;
+                }
+            }
+            for _ in 1..39 {
+                let _ = Out << 8u8;
+            }
+            for _ in 1..39 {
+                let _ = Out << b' ';
+            }
+            for _ in 1..39 {
+                let _ = Out << 8u8;
+            }
+            for _ in 0..count {
+                let _ = Out << b' ';
+            }
+            let _ = Out << if dir { ">>" } else { "<<" };
+            for _ in count..36 {
+                let _ = Out << b' ';
+            }
+            for _ in 0..0x100_0000 {
+                core::hint::spin_loop();
+            }
+        }
+    }
 
-    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(RAM_BASE) << Endl;
-
-    RAM_BASE
+    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(DRAM_BASE) << Endl;
+    DRAM_BASE
 }
 
 #[repr(C)]
@@ -242,15 +255,6 @@ pub struct EgonHead {
     dram_size: u32,
     boot_media: u32,
     string_pool: [u32; 13],
-}
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub struct MainStageHead {
-    /// real offset filled by xtask
-    offset: u32,
-    /// real size filled by xtask
-    length: u32,
 }
 
 #[cfg_attr(not(test), panic_handler)]

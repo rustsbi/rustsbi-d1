@@ -13,3 +13,4 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 [dependencies]
 r0 = "1"
 hal = { path = "../hal" }
+rofs = { path = "../rofs" }

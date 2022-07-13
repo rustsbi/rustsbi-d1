@@ -43,6 +43,7 @@ version = "0.1.0"
 dependencies = [
  "hal",
  "r0",
+ "rofs",
 ]
 
 [[package]]
@@ -295,6 +296,10 @@ dependencies = [
  "bit_field",
  "embedded-hal 0.2.7",
 ]
+
+[[package]]
+name = "rofs"
+version = "0.1.0"
 
 [[package]]
 name = "rustsbi"

@@ -55,7 +55,7 @@ impl Shl<usize> for Out {
             self << b'0'
         } else {
             let mut bits = 1;
-            while bits < rhs {
+            while bits <= rhs {
                 bits *= 10;
             }
             bits /= 10;

@@ -17,9 +17,8 @@ SECTIONS {
     .head : {
         KEEP(*(.head.text))
         KEEP(*(.head.egon))
-        KEEP(*(.head.main))
         KEEP(*(.head.jump))
-        . = ALIGN(256);
+        . = ALIGN(128);
         KEEP(*(.magic.tail))
         KEEP(*(.magic.head))
     } > SRAM

@@ -1,5 +1,6 @@
 [workspace]
-members = ["hal", "bt0", "see", "xtask"]
+members = ["rofs", "hal", "bt0", "see", "xtask"]
+default-members = ["xtask"]
 
 [profile.release]
 lto = true
