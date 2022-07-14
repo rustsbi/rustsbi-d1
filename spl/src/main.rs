@@ -8,8 +8,6 @@ mod magic;
 
 use core::{arch::asm, panic::PanicInfo};
 
-use rofs::PayloadMeta;
-
 #[naked]
 #[no_mangle]
 #[link_section = ".head.text"]
@@ -126,6 +124,7 @@ unsafe extern "C" fn start() -> ! {
 }
 
 extern "C" fn main() -> usize {
+    use common::memory;
     use flash::SpiNand;
     use hal::{
         ccu::Clocks,
@@ -135,26 +134,20 @@ extern "C" fn main() -> usize {
         time::U32Ext,
     };
     use logging::*;
-
-    const SRAM_SIZE: usize = 32 * 1024;
-    const DRAM_BASE: usize = 0x4000_0000;
-
+    // 清空 bss
     extern "C" {
         static mut sbss: u64;
         static mut ebss: u64;
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
-
+    let _ = Out << LOGO << Endl;
+    // 初始化 spi
     let p = Peripherals::take().unwrap();
     let clocks = Clocks {
         psi: 600_000_000.hz(),
         apb1: 24_000_000.hz(),
     };
     let gpio = Gpio::new(p.GPIO);
-
-    let spi_speed = 100_000_000.hz();
-
-    // prepare spi interface to use in flash
     let sck = gpio.portc.pc2.into_function_2();
     let scs = gpio.portc.pc3.into_function_2();
     let mosi = gpio.portc.pc4.into_function_2();
@@ -163,85 +156,58 @@ extern "C" fn main() -> usize {
         p.SPI0,
         (sck, scs, mosi, miso),
         spi::MODE_3,
-        spi_speed,
+        100_000_000.hz(),
         &clocks,
     );
+    // 初始化 flash
     let mut flash = SpiNand::new(spi);
-
-    let _ = Out << "oreboot 🦀" << Endl << "NAND flash:";
+    let _ = Out << "NAND flash:";
     for c in flash.read_id() {
         let _ = Out << b' ' << Hex::Raw(c as _);
     }
     let _ = Out << Endl;
-
-    let mut meta = PayloadMeta::ZERO;
-    let buf = unsafe {
-        core::slice::from_raw_parts_mut(meta.0.as_mut_ptr() as *mut u8, PayloadMeta::SIZE_IN_BYTES)
-    };
-    flash.copy_into(SRAM_SIZE as _, buf);
-
-    let mut count = 0usize;
-    for entry in &meta.0 {
-        if (1..u32::MAX).contains(&entry.size) {
-            count += 1;
-            let _ = Out
-                << "payload "
-                << count
-                << " of "
-                << (entry.size as usize)
-                << " bytes to "
-                << Hex::Fmt(entry.target_offset as _)
-                << Endl;
-        }
+    // 读取 meta
+    let valid_size = 4..1 << 30;
+    let mut src = common::flash::Pos::META;
+    let meta = memory::meta_mut();
+    let buf = meta.as_buf();
+    flash.copy_into(src.next(buf.len() as _), buf);
+    // 如果 see 不存在，停在此阶段
+    if !valid_size.contains(&meta.see) {
+        let _ = Out << "no payload";
+        arrow_walk()
     }
-
-    if count == 0 {
-        let _ = Out << "no payload" << Endl << "[>>";
-        for _ in 0..36 {
-            let _ = Out << b' ';
-        }
-        let _ = Out << b']' << 8u8;
-
-        let mut dir = true;
-        loop {
-            if dir {
-                if count == 36 {
-                    dir = false;
-                } else {
-                    count += 1;
-                }
-            } else {
-                if count == 0 {
-                    dir = true;
-                } else {
-                    count -= 1;
-                }
-            }
-            for _ in 1..39 {
-                let _ = Out << 8u8;
-            }
-            for _ in 1..39 {
-                let _ = Out << b' ';
-            }
-            for _ in 1..39 {
-                let _ = Out << 8u8;
-            }
-            for _ in 0..count {
-                let _ = Out << b' ';
-            }
-            let _ = Out << if dir { ">>" } else { "<<" };
-            for _ in count..36 {
-                let _ = Out << b' ';
-            }
-            for _ in 0..0x100_0000 {
-                core::hint::spin_loop();
-            }
-        }
+    // 确定各阶段在 flash 中的位置
+    let see = src.next(meta.see);
+    let krenel = src.next(meta.kernel);
+    let dtb = src.next(meta.dtb);
+    // 拷贝 dtb
+    if valid_size.contains(&meta.dtb) {
+        const DTB: usize = memory::DRAM;
+        let buf = unsafe { static_buf(DTB, meta.dtb as _) };
+        flash.copy_into(dtb, buf);
+        meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
+        let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
+        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, meta.dtb as _) };
     }
-
-    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(DRAM_BASE) << Endl;
-    DRAM_BASE
+    // 拷贝 see
+    flash.copy_into(see, unsafe { static_buf(memory::DRAM, meta.see as _) });
+    // 拷贝 kernel
+    if valid_size.contains(&meta.kernel) {
+        flash.copy_into(krenel, unsafe {
+            static_buf(memory::KERNEL, meta.kernel as _)
+        });
+    }
+    // 跳转
+    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(memory::DRAM) << Endl;
+    memory::DRAM
 }
+
+const LOGO: &str = r"
+   _  __        __          ___            __    __  ____  _ __
+  / |/ /__ ___ / /  ___ _  / _ )___  ___  / /_  / / / / /_(_) /
+ /    / -_)_ // _ \/ _ `/ / _  / _ \/ _ \/ __/ / /_/ / __/ / /
+/_/|_/\__//__/_//_/\_,_/ /____/\___/\___/\__/  \____/\__/_/_/🦀";
 
 #[repr(C)]
 pub struct EgonHead {
@@ -262,4 +228,73 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {
         core::hint::spin_loop();
     }
+}
+
+#[inline]
+unsafe fn static_buf(base: usize, size: usize) -> &'static mut [u8] {
+    core::slice::from_raw_parts_mut(base as *mut u8, size)
+}
+
+fn arrow_walk() -> ! {
+    use logging::Out;
+
+    let _ = Out << "[>>";
+    for _ in 0..36 {
+        let _ = Out << b' ';
+    }
+    let _ = Out << b']' << 8u8;
+
+    let mut n = 0;
+    let mut d = true;
+    loop {
+        if d {
+            if n == 36 {
+                d = false;
+            } else {
+                n += 1;
+            }
+        } else {
+            if n == 0 {
+                d = true;
+            } else {
+                n -= 1;
+            }
+        }
+        for _ in 1..39 {
+            let _ = Out << 8u8;
+        }
+        for _ in 1..39 {
+            let _ = Out << b' ';
+        }
+        for _ in 1..39 {
+            let _ = Out << 8u8;
+        }
+        for _ in 0..n {
+            let _ = Out << b' ';
+        }
+        let _ = Out << if d { ">>" } else { "<<" };
+        for _ in n..36 {
+            let _ = Out << b' ';
+        }
+        for _ in 0..0x100_0000 {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+fn parse_memory_size(addr: usize) -> usize {
+    use dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
+
+    let mut ans = 0usize;
+    unsafe { Dtb::from_raw_parts_filtered(addr as _, |e| matches!(e, LastCompVersion(16))) }
+        .unwrap()
+        .walk(|path, obj| match obj {
+            DtbObj::SubNode { name } if path.is_root() && name.starts_with("memory") => StepInto,
+            DtbObj::Property(Property::Reg(mut reg)) if path.last().starts_with("memory") => {
+                ans = reg.next().unwrap().len();
+                Terminate
+            }
+            _ => StepOver,
+        });
+    ans
 }

@@ -1,6 +1,10 @@
-﻿use command_ext::{ext, Ext};
+﻿use command_ext::{ext, CommandExt, Ext};
 use once_cell::sync::Lazy;
-use std::{ffi::OsStr, path::PathBuf, process::Command};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 ext!(def; Xfel);
 
@@ -8,30 +12,45 @@ static PATH: Lazy<PathBuf> = Lazy::new(detect_xfel);
 
 impl Xfel {
     #[inline]
-    fn new(command: impl AsRef<OsStr>) -> Self {
+    fn new<I, S>(args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
         let mut xfel = Command::new(&*PATH);
-        xfel.arg(command);
+        xfel.args(args);
         Self(xfel)
     }
 
     #[inline]
     pub fn version() -> Self {
-        Self::new("version")
+        Self::new(["version"])
     }
 
     #[inline]
-    pub fn write() -> Self {
-        Self::new("write")
+    pub fn write(address: usize, file: impl AsRef<Path>) -> Self {
+        let mut ans = Self::new(["write"]);
+        ans.arg(format!("{address:#x}")).arg(file.as_ref());
+        ans
     }
 
     #[inline]
-    pub fn exec() -> Self {
-        Self::new("exec")
+    pub fn exec(address: usize) -> Self {
+        let mut ans = Self::new(["exec"]);
+        ans.arg(format!("{address:#x}"));
+        ans
     }
 
     #[inline]
-    pub fn ddr() -> Self {
-        Self::new("ddr")
+    pub fn ddr(ty: &str) -> Self {
+        Self::new(["ddr", ty])
+    }
+
+    #[inline]
+    pub fn erase(address: usize, length: usize) -> Self {
+        let mut ans = Self::new(["spinand", "erase"]);
+        ans.arg(format!("{address:#x}")).arg(format!("{length}"));
+        ans
     }
 }
 

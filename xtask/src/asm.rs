@@ -1,5 +1,5 @@
 ﻿use crate::{Package, Stage, DIRS};
-use std::{fs, path::PathBuf, process::exit};
+use std::{fs, path::PathBuf};
 
 #[derive(Args)]
 pub struct AsmArgs {
@@ -10,7 +10,7 @@ pub struct AsmArgs {
 }
 
 impl AsmArgs {
-    pub fn asm(&self) {
+    pub fn asm(&self) -> bool {
         // 如果没有设置输出目录，就放在项目根目录
         let output = self.output.as_ref().unwrap_or(&DIRS.workspace).as_path();
         // 如果设置了要反汇编哪个阶段
@@ -23,7 +23,7 @@ impl AsmArgs {
                 output.to_path_buf()
             };
             // 保存
-            fs::write(path, package.objdump()).unwrap();
+            fs::write(path, package.objdump()).is_ok()
         }
         // 如果没有设置要反汇编哪个阶段
         else {
@@ -31,20 +31,22 @@ impl AsmArgs {
                 // 输出就是目录，什么也不用做
             } else if !output.exists() {
                 // 输出不存在，创建为一个目录
-                fs::create_dir_all(output).unwrap();
+                if fs::create_dir_all(output).is_err() {
+                    return false;
+                }
             } else {
                 // 存在一个同名文件，不能用目录替换文件
                 error!("output path must be a directory");
-                exit(1)
+                return false;
             }
             // 保存两个文件
-            for package in Package::both() {
+            Package::both().into_iter().all(|package| {
                 fs::write(
                     output.join(package.name()).with_extension("asm"),
                     package.objdump(),
                 )
-                .unwrap();
-            }
+                .is_ok()
+            })
         }
     }
 }

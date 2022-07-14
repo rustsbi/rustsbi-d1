@@ -38,15 +38,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "bt0"
-version = "0.1.0"
-dependencies = [
- "hal",
- "r0",
- "rofs",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +89,10 @@ source = "git+https://github.com/YdrMaster/command-ext.git?rev=f25befb#f25befb0b
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "common"
+version = "0.1.0"
 
 [[package]]
 name = "d1-pac"
@@ -298,10 +293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rofs"
-version = "0.1.0"
-
-[[package]]
 name = "rustsbi"
 version = "0.3.0-alpha.1"
 source = "git+https://github.com/rustsbi/rustsbi?rev=af60b02#af60b0211ff0354f618ed437beca471ef49a0f61"
@@ -336,6 +327,16 @@ dependencies = [
  "log",
  "termcolor",
  "time",
+]
+
+[[package]]
+name = "spl"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dtb-walker",
+ "hal",
+ "r0",
 ]
 
 [[package]]
@@ -449,6 +450,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "command-ext",
+ "common",
  "log",
  "once_cell",
  "simplelog",

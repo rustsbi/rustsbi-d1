@@ -31,6 +31,7 @@ enum Commands {
     Asm(AsmArgs),
     Boot,
     Debug(DebugArg),
+    Erase(EraseArg),
 }
 
 static DIRS: Lazy<Dirs> = Lazy::new(Dirs::new);
@@ -49,7 +50,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Asm(args) => args.asm(),
         Boot => todo!(),
         Debug(arg) => arg.debug(),
-    }
+        Erase(arg) => arg.erase(),
+    };
     Ok(())
 }
 
@@ -90,22 +92,22 @@ impl Stage {
     #[inline]
     const fn package(&self) -> Package {
         match self {
-            Self::Sram => Package::Bt0,
+            Self::Sram => Package::Spl,
             Self::Dram => Package::See,
         }
     }
 
     #[inline]
-    const fn base_addr(&self) -> &'static str {
+    const fn base_addr(&self) -> usize {
         match self {
-            Stage::Sram => "0x20000",
-            Stage::Dram => "0x40000000",
+            Stage::Sram => 0x0002_0000,
+            Stage::Dram => 0x4000_0000,
         }
     }
 }
 
 enum Package {
-    Bt0,
+    Spl,
     See,
 }
 
@@ -113,14 +115,14 @@ impl Package {
     #[inline]
     const fn name(&self) -> &'static str {
         match self {
-            Self::Bt0 => "bt0",
+            Self::Spl => "spl",
             Self::See => "see",
         }
     }
 
     #[inline]
     const fn both() -> [Self; 2] {
-        [Self::Bt0, Self::See]
+        [Self::Spl, Self::See]
     }
 
     #[inline]
@@ -163,13 +165,95 @@ struct DebugArg {
 }
 
 impl DebugArg {
-    fn debug(&self) {
-        let base_addr = self.stage.base_addr();
-        let bin = self.stage.package().objcopy();
+    fn debug(&self) -> bool {
+        let address = self.stage.base_addr();
+        let file = self.stage.package().objcopy();
         if let Stage::Dram = self.stage {
-            Xfel::ddr().arg("d1").invoke();
+            Xfel::ddr("d1").invoke();
         }
-        Xfel::write().arg(base_addr).arg(bin).invoke();
-        Xfel::exec().arg(base_addr).invoke();
+        info!("writing {} to {address:#x}", file.display());
+        Xfel::write(address, file).invoke();
+        info!("execute from {address:#x}");
+        Xfel::exec(address).invoke();
+        true
+    }
+}
+
+#[derive(Args)]
+struct EraseArg {
+    #[clap(short, long)]
+    range: Option<String>,
+}
+
+impl EraseArg {
+    fn erase(&self) -> bool {
+        let range = match &self.range {
+            Some(s) => s,
+            None => {
+                const META: usize = common::flash::Pos::META.value();
+                let range = META..META + 4096;
+                info!("erasing range: {range:#x?}");
+                Xfel::erase(range.start, range.len()).invoke();
+                return true;
+            }
+        };
+        let range = if let Some((start, end)) = range.split_once("..") {
+            let start = match parse_num(start) {
+                Some(val) => val,
+                None => {
+                    error!("failed to parse start \"{start}\"");
+                    return false;
+                }
+            };
+            let end = match parse_num(end) {
+                Some(val) => val,
+                None => {
+                    error!("failed to parse end \"{end}\"");
+                    return false;
+                }
+            };
+            start..end
+        } else if let Some(temp) = range.trim_end().strip_suffix(']') {
+            let (base, len) = match temp.split_once('[') {
+                Some(pair) => pair,
+                None => {
+                    error!("failed to split base and len: \"{temp}\"");
+                    return false;
+                }
+            };
+            let base = match parse_num(base) {
+                Some(val) => val,
+                None => {
+                    error!("failed to parse base \"{base}\"");
+                    return false;
+                }
+            };
+            let len = match parse_num(len) {
+                Some(val) => val,
+                None => {
+                    error!("failed to parse len \"{len}\"");
+                    return false;
+                }
+            };
+            base..base + len
+        } else {
+            error!("cannot parse range: {range}");
+            return false;
+        };
+        if range.is_empty() {
+            error!("erasing range is empty {range:#x?}");
+            false
+        } else {
+            info!("erasing range: {range:#x?}");
+            Xfel::erase(range.start, range.len()).invoke();
+            true
+        }
+    }
+}
+
+fn parse_num(s: &str) -> Option<usize> {
+    match s.trim_start().strip_prefix("0x") {
+        Some(s) => usize::from_str_radix(s, 16).ok(),
+        None => usize::from_str_radix(s, 10).ok(),
     }
 }
