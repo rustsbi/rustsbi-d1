@@ -35,6 +35,13 @@ impl Xfel {
     }
 
     #[inline]
+    pub fn write32(address: usize, value: u32) -> Self {
+        let mut ans = Self::new(["write32"]);
+        ans.arg(format!("{address:#x}")).arg(format!("{value:#x}"));
+        ans
+    }
+
+    #[inline]
     pub fn exec(address: usize) -> Self {
         let mut ans = Self::new(["exec"]);
         ans.arg(format!("{address:#x}"));

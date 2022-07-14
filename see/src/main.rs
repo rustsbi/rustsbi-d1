@@ -21,26 +21,6 @@ struct Supervisor {
     opaque: usize,
 }
 
-#[naked]
-#[no_mangle]
-#[link_section = ".head.jump"]
-unsafe extern "C" fn head_jump() -> ! {
-    asm!(
-        ".option push",
-        ".option rvc",
-        "c.j    0x0c",
-        ".option pop",
-        options(noreturn)
-    )
-}
-
-#[no_mangle]
-#[link_section = ".head.info"]
-static mut PAYLOAD: PayloadInfo = PayloadInfo {
-    total_size: 0,
-    dtb_offset: 0,
-};
-
 /// 入口。
 ///
 /// 1. 关中断
@@ -86,20 +66,21 @@ extern "C" fn rust_main() {
 
     extensions::init();
 
-    let payload = unsafe { PAYLOAD };
-    let dtb_addr = SUPERVISOR_ENTRY + payload.dtb_offset as usize;
-    println!("{payload:#x?}");
-
-    let board_info = device_tree(dtb_addr);
+    let meta = common::memory::meta();
+    let board_info = meta.dtb().and_then(parse_board_info);
+    if board_info.is_none() {
+        println!("[rustsbi] no dtb file detected");
+    }
     let mem = board_info
         .as_ref()
         .map_or(RAM_BASE..RAM_BASE + (512 << 20), |i| i.mem.clone());
     let dtb = board_info.as_ref().map_or(0..0, |i| i.dtb.clone());
     print!(
-        "
+        "\
 [rustsbi] RustSBI version {ver_sbi}, adapting to RISC-V SBI v1.0.0
 {logo}
 [rustsbi] Implementation     : RustSBI-D1 Version {ver_impl}
+[rustsbi] Extensions         : [legacy console, timer, reset, ipi]
 [rustsbi] Platform Name      : {model}
 [rustsbi] Platform SMP       : 1
 [rustsbi] Platform Memory    : {mem:#x?}
@@ -114,7 +95,7 @@ extern "C" fn rust_main() {
         ver_sbi = rustsbi::VERSION,
         logo = rustsbi::logo(),
         ver_impl = env!("CARGO_PKG_VERSION"),
-        firmware = head_jump as usize,
+        firmware = entry as usize,
     );
 
     set_pmp(mem.clone());
@@ -124,22 +105,19 @@ extern "C" fn rust_main() {
     use hal::pac::plic::ctrl::CTRL_A;
     plic.ctrl.write(|w| w.ctrl().variant(CTRL_A::MS));
 
-    let dtb_addr = if !dtb.is_empty() {
-        const PAGE: usize = 1 << 12;
-        let start = (mem.start + mem.len().min(1 << 30)) - ((dtb.len() + PAGE - 1) / PAGE) * PAGE;
-        let src = dtb.start as *const u8;
-        let dst = start as *mut u8;
-        unsafe { dst.copy_from(src, dtb.len()) };
-        start
+    if meta.len_kernel().is_none() {
+        println!("no kernel");
+        loop {
+            core::hint::spin_loop();
+        }
     } else {
-        0
-    };
-
-    println!("execute_supervisor at {SUPERVISOR_ENTRY:#x} with a1 = {dtb_addr:#x}");
-    execute_supervisor(Supervisor {
-        start_addr: SUPERVISOR_ENTRY,
-        opaque: dtb_addr,
-    })
+        let dtb_addr = meta.dtb().map_or(0, |s| s.as_ptr() as usize);
+        println!("execute_supervisor at {SUPERVISOR_ENTRY:#x} with a1 = {dtb_addr:#x}");
+        execute_supervisor(Supervisor {
+            start_addr: SUPERVISOR_ENTRY,
+            opaque: dtb_addr,
+        })
+    }
 }
 
 /// 设置 PMP。
@@ -176,11 +154,13 @@ impl<const N: usize> StringInline<N> {
     }
 }
 
-fn device_tree(addr: usize) -> Option<BoardInfo> {
+fn parse_board_info(slice: &[u8]) -> Option<BoardInfo> {
     use dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
 
+    let ptr = slice.as_ptr();
+    let addr = ptr as usize;
     let dtb = unsafe {
-        match Dtb::from_raw_parts_filtered(addr as _, |e| matches!(e, LastCompVersion(16))) {
+        match Dtb::from_raw_parts_filtered(ptr, |e| matches!(e, LastCompVersion(16))) {
             Ok(dtb) => dtb,
             Err(e) => {
                 println!("Dtb not detected at {addr:#x}: {e:?}");
@@ -225,13 +205,6 @@ fn device_tree(addr: usize) -> Option<BoardInfo> {
         DtbObj::Property(_) => StepOver,
     });
     Some(ans)
-}
-
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-struct PayloadInfo {
-    total_size: u32,
-    dtb_offset: u32,
 }
 
 #[cfg_attr(not(test), panic_handler)]

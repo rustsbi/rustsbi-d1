@@ -167,40 +167,45 @@ extern "C" fn main() -> usize {
     }
     let _ = Out << Endl;
     // 读取 meta
-    let valid_size = 4..1 << 30;
     let mut src = common::flash::Pos::META;
     let meta = memory::meta_mut();
     let buf = meta.as_buf();
     flash.copy_into(src.next(buf.len() as _), buf);
     // 如果 see 不存在，停在此阶段
-    if !valid_size.contains(&meta.see) {
-        let _ = Out << "no payload";
-        arrow_walk()
+    match meta.len_see() {
+        None => arrow_walk(),
+        Some(len_see) => {
+            let len_kernel = meta.len_kernel().unwrap_or(0);
+            let len_dtb = meta.len_dtb().unwrap_or(0);
+            // 确定各阶段在 flash 中的位置
+            let see = src.next(len_see);
+            let krenel = src.next(len_kernel);
+            let dtb = src.next(len_dtb);
+            // 拷贝 dtb
+            if len_dtb > 0 {
+                const DTB: usize = memory::DRAM;
+                let buf = unsafe { static_buf(DTB, len_dtb as _) };
+                flash.copy_into(dtb, buf);
+                meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
+                let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
+                unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len_dtb as _) };
+            }
+            // 拷贝 see
+            flash.copy_into(see, unsafe { static_buf(memory::DRAM, len_see as _) });
+            // 拷贝 kernel
+            if len_kernel > 0 {
+                flash.copy_into(krenel, unsafe {
+                    static_buf(memory::KERNEL, len_kernel as _)
+                });
+            }
+            // 跳转
+            let _ = Out
+                << "everyting is ready, jump to main stage at "
+                << Hex::Fmt(memory::DRAM)
+                << Endl;
+            memory::DRAM
+        }
     }
-    // 确定各阶段在 flash 中的位置
-    let see = src.next(meta.see);
-    let krenel = src.next(meta.kernel);
-    let dtb = src.next(meta.dtb);
-    // 拷贝 dtb
-    if valid_size.contains(&meta.dtb) {
-        const DTB: usize = memory::DRAM;
-        let buf = unsafe { static_buf(DTB, meta.dtb as _) };
-        flash.copy_into(dtb, buf);
-        meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
-        let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
-        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, meta.dtb as _) };
-    }
-    // 拷贝 see
-    flash.copy_into(see, unsafe { static_buf(memory::DRAM, meta.see as _) });
-    // 拷贝 kernel
-    if valid_size.contains(&meta.kernel) {
-        flash.copy_into(krenel, unsafe {
-            static_buf(memory::KERNEL, meta.kernel as _)
-        });
-    }
-    // 跳转
-    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(memory::DRAM) << Endl;
-    memory::DRAM
 }
 
 const LOGO: &str = r"
@@ -238,8 +243,8 @@ unsafe fn static_buf(base: usize, size: usize) -> &'static mut [u8] {
 fn arrow_walk() -> ! {
     use logging::Out;
 
-    let _ = Out << "[>>";
-    for _ in 0..36 {
+    let _ = Out << "no payload [>>";
+    for _ in 0..48 {
         let _ = Out << b' ';
     }
     let _ = Out << b']' << 8u8;
@@ -248,7 +253,7 @@ fn arrow_walk() -> ! {
     let mut d = true;
     loop {
         if d {
-            if n == 36 {
+            if n == 48 {
                 d = false;
             } else {
                 n += 1;
@@ -260,23 +265,23 @@ fn arrow_walk() -> ! {
                 n -= 1;
             }
         }
-        for _ in 1..39 {
+        for _ in 1..51 {
             let _ = Out << 8u8;
         }
-        for _ in 1..39 {
+        for _ in 1..51 {
             let _ = Out << b' ';
         }
-        for _ in 1..39 {
+        for _ in 1..51 {
             let _ = Out << 8u8;
         }
         for _ in 0..n {
             let _ = Out << b' ';
         }
         let _ = Out << if d { ">>" } else { "<<" };
-        for _ in n..36 {
+        for _ in n..48 {
             let _ = Out << b' ';
         }
-        for _ in 0..0x100_0000 {
+        for _ in 0..0x80_0000 {
             core::hint::spin_loop();
         }
     }

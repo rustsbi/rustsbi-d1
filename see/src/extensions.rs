@@ -12,18 +12,9 @@ struct Ipi;
 
 pub fn init() {
     rustsbi::legacy_stdio::init_legacy_stdio(&LegacyConsole);
-    println!(
-        "
-sbi module initialized:
-
-- legacy console"
-    );
     rustsbi::init_timer(&Timer);
-    println!("- timer");
     rustsbi::init_reset(&Reset);
-    println!("- reset");
     rustsbi::init_ipi(&Ipi);
-    println!("- ipi");
 }
 
 impl rustsbi::legacy_stdio::LegacyStdio for LegacyConsole {

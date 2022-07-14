@@ -9,17 +9,13 @@ fn main() {
 
 const NEZHA_FLASH: &[u8] = b"
 OUTPUT_ARCH(riscv)
-ENTRY(head_jump)
+ENTRY(entry)
 MEMORY {
     DDR : ORIGIN = 0x40000000, LENGTH = 2M
 }
 SECTIONS {
-    .head : {
-        KEEP(*(.head.jump))
-        KEEP(*(.head.info))
-    } > DDR
-    .text : ALIGN(4) {
-        KEEP(*(.text.entry))
+    .text : {
+        *(.text.entry)
         . = ALIGN(4);
         *(.text.trap_handler)
         *(.text .text.*)

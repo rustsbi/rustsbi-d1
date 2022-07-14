@@ -1,19 +1,47 @@
 #![no_std]
 
+use core::ops::Range;
+
 #[derive(Clone)]
 pub struct PayloadMeta {
-    pub see: u32,
-    pub kernel: u32,
-    pub dtb: u32,
-    pub dtb_offset: u32,
+    see: u32,
+    kernel: u32,
+    dtb: u32,
+    dtb_offset: u32,
 }
 
+const VALID_SIZE: Range<u32> = 4..(1 << 30);
+
 impl PayloadMeta {
+    pub const SIZE: usize = core::mem::size_of::<Self>();
+
     #[inline]
     pub fn as_buf(&mut self) -> &mut [u8] {
-        unsafe {
-            core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, core::mem::size_of::<Self>())
-        }
+        unsafe { core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, Self::SIZE) }
+    }
+
+    #[inline]
+    pub fn len_see(&self) -> Option<u32> {
+        Some(self.see).filter(|size| VALID_SIZE.contains(size))
+    }
+
+    #[inline]
+    pub fn len_kernel(&self) -> Option<u32> {
+        Some(self.kernel).filter(|size| VALID_SIZE.contains(size))
+    }
+
+    #[inline]
+    pub fn len_dtb(&self) -> Option<u32> {
+        Some(self.dtb).filter(|size| VALID_SIZE.contains(size))
+    }
+
+    #[inline]
+    pub fn dtb(&self) -> Option<&[u8]> {
+        let len = self.len_dtb()? as usize;
+        let ptr = Some(self.dtb_offset)
+            .filter(|off| *off > 0)
+            .map(|off| (memory::DRAM + off as usize) as *const u8)?;
+        Some(unsafe { core::slice::from_raw_parts(ptr, len) })
     }
 }
 
@@ -22,7 +50,7 @@ pub mod memory {
     pub const SRAM: usize = 0x20000;
     pub const DRAM: usize = 0x4000_0000;
     pub const KERNEL: usize = 0x4020_0000;
-    const META: usize = SRAM + 16584;
+    pub const META: usize = SRAM + 16584;
 
     #[inline]
     pub fn dtb_offset(mem_size: usize) -> usize {

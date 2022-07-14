@@ -311,6 +311,7 @@ checksum = "9052abf4e5360c78094e445e2c8f7975481c45094e068230b7a1860709289cee"
 name = "see"
 version = "0.1.0"
 dependencies = [
+ "common",
  "dtb-walker",
  "hal",
  "r0",

@@ -170,6 +170,11 @@ impl DebugArg {
         let file = self.stage.package().objcopy();
         if let Stage::Dram = self.stage {
             Xfel::ddr("d1").invoke();
+            for i in 0..common::PayloadMeta::SIZE / 4 {
+                let address = common::memory::META + i * 4;
+                info!("write 0 to {address:#x}");
+                Xfel::write32(address, 0).invoke();
+            }
         }
         info!("writing {} to {address:#x}", file.display());
         Xfel::write(address, file).invoke();
