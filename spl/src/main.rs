@@ -172,40 +172,37 @@ extern "C" fn main() -> usize {
     let buf = meta.as_buf();
     flash.copy_into(src.next(buf.len() as _), buf);
     // 如果 see 不存在，停在此阶段
-    match meta.len_see() {
-        None => arrow_walk(),
-        Some(len_see) => {
-            let len_kernel = meta.len_kernel().unwrap_or(0);
-            let len_dtb = meta.len_dtb().unwrap_or(0);
-            // 确定各阶段在 flash 中的位置
-            let see = src.next(len_see);
-            let krenel = src.next(len_kernel);
-            let dtb = src.next(len_dtb);
-            // 拷贝 dtb
-            if len_dtb > 0 {
-                const DTB: usize = memory::DRAM;
-                let buf = unsafe { static_buf(DTB, len_dtb as _) };
-                flash.copy_into(dtb, buf);
-                meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
-                let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
-                unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len_dtb as _) };
-            }
-            // 拷贝 see
-            flash.copy_into(see, unsafe { static_buf(memory::DRAM, len_see as _) });
-            // 拷贝 kernel
-            if len_kernel > 0 {
-                flash.copy_into(krenel, unsafe {
-                    static_buf(memory::KERNEL, len_kernel as _)
-                });
-            }
-            // 跳转
-            let _ = Out
-                << "everyting is ready, jump to main stage at "
-                << Hex::Fmt(memory::DRAM)
-                << Endl;
-            memory::DRAM
-        }
+    if meta.len_see() == 0 {
+        arrow_walk()
     }
+    // 计算各段长度
+    let len_see = meta.len_see();
+    let len_kernel = meta.len_kernel();
+    let len_dtb = meta.len_dtb();
+    // 确定各阶段在 flash 中的位置
+    let see = src.next(len_see);
+    let krenel = src.next(len_kernel);
+    let dtb = src.next(len_dtb);
+    // 拷贝 dtb
+    if len_dtb > 0 {
+        const DTB: usize = memory::DRAM;
+        let buf = unsafe { static_buf(DTB, len_dtb as _) };
+        flash.copy_into(dtb, buf);
+        meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
+        let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
+        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len_dtb as _) };
+    }
+    // 拷贝 see
+    flash.copy_into(see, unsafe { static_buf(memory::DRAM, len_see as _) });
+    // 拷贝 kernel
+    if len_kernel > 0 {
+        flash.copy_into(krenel, unsafe {
+            static_buf(memory::KERNEL, len_kernel as _)
+        });
+    }
+    // 跳转
+    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(memory::DRAM) << Endl;
+    memory::DRAM
 }
 
 const LOGO: &str = r"
@@ -243,44 +240,12 @@ unsafe fn static_buf(base: usize, size: usize) -> &'static mut [u8] {
 fn arrow_walk() -> ! {
     use logging::Out;
 
-    let _ = Out << "no payload [>>";
-    for _ in 0..48 {
-        let _ = Out << b' ';
-    }
-    let _ = Out << b']' << 8u8;
-
-    let mut n = 0;
-    let mut d = true;
+    let _ = Out << "no payload ";
+    let mut arrow = common::Arrow::init(52, |arr| {
+        let _ = Out << unsafe { core::str::from_utf8_unchecked(arr) };
+    });
     loop {
-        if d {
-            if n == 48 {
-                d = false;
-            } else {
-                n += 1;
-            }
-        } else {
-            if n == 0 {
-                d = true;
-            } else {
-                n -= 1;
-            }
-        }
-        for _ in 1..51 {
-            let _ = Out << 8u8;
-        }
-        for _ in 1..51 {
-            let _ = Out << b' ';
-        }
-        for _ in 1..51 {
-            let _ = Out << 8u8;
-        }
-        for _ in 0..n {
-            let _ = Out << b' ';
-        }
-        let _ = Out << if d { ">>" } else { "<<" };
-        for _ in n..48 {
-            let _ = Out << b' ';
-        }
+        arrow.next();
         for _ in 0..0x80_0000 {
             core::hint::spin_loop();
         }

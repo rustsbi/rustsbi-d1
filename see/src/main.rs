@@ -105,11 +105,8 @@ extern "C" fn rust_main() {
     use hal::pac::plic::ctrl::CTRL_A;
     plic.ctrl.write(|w| w.ctrl().variant(CTRL_A::MS));
 
-    if meta.len_kernel().is_none() {
-        println!("no kernel");
-        loop {
-            core::hint::spin_loop();
-        }
+    if meta.len_kernel() == 0 {
+        arrow_walk()
     } else {
         let dtb_addr = meta.dtb().map_or(0, |s| s.as_ptr() as usize);
         println!("execute_supervisor at {SUPERVISOR_ENTRY:#x} with a1 = {dtb_addr:#x}");
@@ -152,6 +149,20 @@ impl<const N: usize> StringInline<N> {
     pub fn as_str(&self) -> &str {
         unsafe { core::str::from_utf8_unchecked(&self.1[..self.0]) }
     }
+}
+
+#[cfg_attr(not(test), panic_handler)]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{info}");
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+#[inline(always)]
+unsafe fn set_mtvec(trap_handler: usize) {
+    use riscv::register::mtvec;
+    mtvec::write(trap_handler, mtvec::TrapMode::Direct);
 }
 
 fn parse_board_info(slice: &[u8]) -> Option<BoardInfo> {
@@ -207,16 +218,15 @@ fn parse_board_info(slice: &[u8]) -> Option<BoardInfo> {
     Some(ans)
 }
 
-#[cfg_attr(not(test), panic_handler)]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{info}");
+fn arrow_walk() -> ! {
+    print!("[rustsbi] no kernel ");
+    let mut arrow = common::Arrow::init(51, |arr| {
+        print!("{}", unsafe { core::str::from_utf8_unchecked(arr) })
+    });
     loop {
-        core::hint::spin_loop();
+        arrow.next();
+        for _ in 0..0x40_0000 {
+            core::hint::spin_loop();
+        }
     }
-}
-
-#[inline(always)]
-unsafe fn set_mtvec(trap_handler: usize) {
-    use riscv::register::mtvec;
-    mtvec::write(trap_handler, mtvec::TrapMode::Direct);
 }

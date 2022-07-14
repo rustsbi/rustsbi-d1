@@ -1,5 +1,8 @@
 #![no_std]
 
+mod arrow;
+
+pub use arrow::Arrow;
 use core::ops::Range;
 
 #[derive(Clone)]
@@ -7,7 +10,7 @@ pub struct PayloadMeta {
     see: u32,
     kernel: u32,
     dtb: u32,
-    dtb_offset: u32,
+    pub dtb_offset: u32,
 }
 
 const VALID_SIZE: Range<u32> = 4..(1 << 30);
@@ -21,23 +24,37 @@ impl PayloadMeta {
     }
 
     #[inline]
-    pub fn len_see(&self) -> Option<u32> {
-        Some(self.see).filter(|size| VALID_SIZE.contains(size))
+    pub fn len_see(&self) -> u32 {
+        if VALID_SIZE.contains(&self.see) {
+            self.see
+        } else {
+            0
+        }
     }
 
     #[inline]
-    pub fn len_kernel(&self) -> Option<u32> {
-        Some(self.kernel).filter(|size| VALID_SIZE.contains(size))
+    pub fn len_kernel(&self) -> u32 {
+        if VALID_SIZE.contains(&self.kernel) {
+            self.kernel
+        } else {
+            0
+        }
     }
 
     #[inline]
-    pub fn len_dtb(&self) -> Option<u32> {
-        Some(self.dtb).filter(|size| VALID_SIZE.contains(size))
+    pub fn len_dtb(&self) -> u32 {
+        if VALID_SIZE.contains(&self.dtb) {
+            self.dtb
+        } else {
+            0
+        }
     }
 
     #[inline]
     pub fn dtb(&self) -> Option<&[u8]> {
-        let len = self.len_dtb()? as usize;
+        let len = Some(self.len_dtb())
+            .filter(|len| *len > 0)
+            .map(|len| len as usize)?;
         let ptr = Some(self.dtb_offset)
             .filter(|off| *off > 0)
             .map(|off| (memory::DRAM + off as usize) as *const u8)?;

@@ -19,11 +19,6 @@ pub(crate) fn execute_supervisor(supervisor: Supervisor) {
         medeleg::set_load_page_fault();
         medeleg::set_store_page_fault();
         medeleg::set_user_env_call();
-        // asm!("csrw medeleg, {}", in(reg) usize::MAX);
-        // medeleg::clear_illegal_instruction();
-        // medeleg::clear_supervisor_env_call();
-        // medeleg::clear_machine_env_call();
-
         crate::set_mtvec(s_to_m as usize);
         mie::set_mext();
         mie::set_msoft();
