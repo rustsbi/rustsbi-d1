@@ -8,6 +8,8 @@ mod magic;
 
 use core::{arch::asm, panic::PanicInfo};
 
+use common::memory::DRAM;
+
 #[naked]
 #[no_mangle]
 #[link_section = ".head.text"]
@@ -45,6 +47,9 @@ unsafe extern "C" fn main_jump() -> ! {
     asm!("j {}", sym start, options(noreturn))
 }
 
+#[link_section = ".head.meta"]
+static mut META: common::memory::Meta = common::memory::Meta::DEFAULT;
+
 /// Jump over head data to executable code.
 ///
 /// # Safety
@@ -61,25 +66,11 @@ unsafe extern "C" fn start() -> ! {
     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
     asm!(
         // 关中断
-        "   csrw   mie, zero",
-        // 拷贝魔法二进制前 128 字节到 sram 开始位置
-        "
-            la   t0, {head}
-            la   t1, {magic_head}
-            la   t2, {magic_tail}
-
-        1:
-            bgeu t0, t2, 1f
-            ld   t3, 0(t1)
-            sd   t3, 0(t0)
-            addi t1, t1, 8
-            addi t0, t0, 8
-            j    1b
-        1:
-        ",
+        "   csrw mie, zero",
+        // 交换头 128 字节
+        "   call {swap}",
         // 拷贝参数
-        "
-            la   t0, {head}
+        "   la   t0, {head}
             la   t1, {param}
             li   t2, {param_len}
 
@@ -96,29 +87,51 @@ unsafe extern "C" fn start() -> ! {
         1:
         ",
         // 魔法
-        "
-            fence.i
+        "   fence.i
             la   sp, {stack}
             li   t0, {stack_size}
             add  sp, sp, t0
             call {head}
         ",
-        // 拷贝下一阶段
-        "   call {main}",
+        // 换回头 128 字节
+        "   call {swap}",
         // 启动！
-        "
+        "   call {main}
             fence.i
             jr   a0
         ",
         head       =   sym head_jump,
-        magic_head =   sym magic::HEAD,
-        magic_tail =   sym magic::TAIL,
+        swap       =   sym head_swap,
         param      =   sym magic::PARAM,
         param_len  = const magic::DDR3Param::LEN,
 
         stack      =   sym STACK,
         stack_size = const STACK_SIZE,
         main       =   sym main,
+        options(noreturn)
+    )
+}
+
+#[naked]
+unsafe extern "C" fn head_swap() {
+    asm!(
+        "   la   t0, {head}
+            la   t1, {magic_head}
+            la   t2, {magic_tail}
+
+        1:  bgeu t0, t2, 1f
+            ld   t3, 0(t0)
+            ld   t4, 0(t1)
+            sd   t4, 0(t0)
+            sd   t3, 0(t1)
+            addi t1, t1, 8
+            addi t0, t0, 8
+            j    1b
+        1:  ret
+        ",
+        head       = sym head_jump,
+        magic_head = sym magic::HEAD,
+        magic_tail = sym magic::TAIL,
         options(noreturn)
     )
 }
@@ -141,6 +154,15 @@ extern "C" fn main() -> usize {
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
     let _ = Out << LOGO << Endl;
+    // 如果不是从 flash 引导的，直接按照 dram 放好的位置跳
+    if !unsafe { META.from_flash } {
+        let see = unsafe { META.see };
+        if see == !0 {
+            arrow_walk()
+        } else {
+            return DRAM + see as usize;
+        }
+    }
     // 初始化 spi
     let p = Peripherals::take().unwrap();
     let clocks = Clocks {
@@ -167,38 +189,29 @@ extern "C" fn main() -> usize {
     }
     let _ = Out << Endl;
     // 读取 meta
-    let mut src = common::flash::Pos::META;
-    let meta = memory::meta_mut();
-    let buf = meta.as_buf();
-    flash.copy_into(src.next(buf.len() as _), buf);
+    let mut meta = unsafe { common::flash::Meta::uninit() };
+    flash.copy_into(common::flash::Meta::POS, meta.as_buf());
     // 如果 see 不存在，停在此阶段
-    if meta.len_see() == 0 {
-        arrow_walk()
-    }
-    // 计算各段长度
-    let len_see = meta.len_see();
-    let len_kernel = meta.len_kernel();
-    let len_dtb = meta.len_dtb();
-    // 确定各阶段在 flash 中的位置
-    let see = src.next(len_see);
-    let krenel = src.next(len_kernel);
-    let dtb = src.next(len_dtb);
+    let (see_pos, see_len) = match meta.see() {
+        Some(pair) => pair,
+        None => arrow_walk(),
+    };
     // 拷贝 dtb
-    if len_dtb > 0 {
+    if let Some((base, len)) = meta.dtb() {
         const DTB: usize = memory::DRAM;
-        let buf = unsafe { static_buf(DTB, len_dtb as _) };
-        flash.copy_into(dtb, buf);
-        meta.dtb_offset = memory::dtb_offset(parse_memory_size(DTB)) as _;
-        let dst = (memory::DRAM + meta.dtb_offset as usize) as *mut u8;
-        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len_dtb as _) };
+        flash.copy_into(base, unsafe { static_buf(DTB, len) });
+        let offset = memory::dtb_offset(parse_memory_size(DTB));
+        unsafe { META.dtb = offset as _ };
+        let dst = (memory::DRAM + offset) as *mut u8;
+        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len) };
     }
     // 拷贝 see
-    flash.copy_into(see, unsafe { static_buf(memory::DRAM, len_see as _) });
+    flash.copy_into(see_pos, unsafe { static_buf(memory::DRAM, see_len) });
+    unsafe { META.dtb = 0 };
     // 拷贝 kernel
-    if len_kernel > 0 {
-        flash.copy_into(krenel, unsafe {
-            static_buf(memory::KERNEL, len_kernel as _)
-        });
+    if let Some((base, len)) = meta.kernel() {
+        flash.copy_into(base, unsafe { static_buf(memory::KERNEL, len) });
+        unsafe { META.dtb = (memory::KERNEL - memory::DRAM) as _ };
     }
     // 跳转
     let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(memory::DRAM) << Endl;

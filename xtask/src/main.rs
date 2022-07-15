@@ -170,11 +170,14 @@ impl DebugArg {
         let file = self.stage.package().objcopy();
         if let Stage::Dram = self.stage {
             Xfel::ddr("d1").invoke();
-            for i in 0..common::PayloadMeta::SIZE / 4 {
-                let address = common::memory::META + i * 4;
-                info!("write 0 to {address:#x}");
-                Xfel::write32(address, 0).invoke();
-            }
+            common::memory::Meta::DEFAULT
+                .as_u32s()
+                .into_iter()
+                .copied()
+                .enumerate()
+                .for_each(|(i, value)| {
+                    Xfel::write32(common::memory::META + i * 4, value).invoke();
+                });
         }
         info!("writing {} to {address:#x}", file.display());
         Xfel::write(address, file).invoke();
@@ -195,7 +198,7 @@ impl EraseArg {
         let range = match &self.range {
             Some(s) => s,
             None => {
-                const META: usize = common::flash::Pos::META.value();
+                const META: usize = common::flash::Meta::POS as _;
                 let range = META..META + 4096;
                 info!("erasing range: {range:#x?}");
                 Xfel::erase(range.start, range.len()).invoke();

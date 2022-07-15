@@ -11,9 +11,7 @@ extern crate rustsbi;
 
 use core::{arch::asm, ops::Range, panic::PanicInfo};
 
-const RAM_BASE: usize = 0x4000_0000;
-const SUPERVISOR_OFFSET: usize = 0x20_0000;
-const SUPERVISOR_ENTRY: usize = RAM_BASE + SUPERVISOR_OFFSET;
+use common::memory;
 
 /// 特权软件信息。
 struct Supervisor {
@@ -56,6 +54,7 @@ unsafe extern "C" fn entry() -> ! {
 }
 
 extern "C" fn rust_main() {
+    use common::memory::*;
     use execute::execute_supervisor;
 
     extern "C" {
@@ -66,15 +65,16 @@ extern "C" fn rust_main() {
 
     extensions::init();
 
-    let meta = common::memory::meta();
-    let board_info = meta.dtb().and_then(parse_board_info);
-    if board_info.is_none() {
-        println!("[rustsbi] no dtb file detected");
-    }
-    let mem = board_info
-        .as_ref()
-        .map_or(RAM_BASE..RAM_BASE + (512 << 20), |i| i.mem.clone());
-    let dtb = board_info.as_ref().map_or(0..0, |i| i.dtb.clone());
+    let meta = Meta::static_ref();
+    let board_info = match meta.dtb() {
+        Some(dtb) => parse_board_info(dtb),
+        None => {
+            println!("[rustsbi] no dtb file detected");
+            None
+        }
+    };
+
+    let kernel = meta.kernel().unwrap_or(0);
     print!(
         "\
 [rustsbi] RustSBI version {ver_sbi}, adapting to RISC-V SBI v1.0.0
@@ -87,38 +87,40 @@ extern "C" fn rust_main() {
 [rustsbi] Boot HART          : 0
 [rustsbi] Device Tree Region : {dtb:#x?}
 [rustsbi] Firmware Address   : {firmware:#x}
-[rustsbi] Supervisor Address : {SUPERVISOR_ENTRY:#x}
+[rustsbi] Supervisor Address : {kernel:#x}
 ",
-        model = board_info
-            .as_ref()
-            .map_or("sun20iw1p1", |i| i.model.as_str()),
+        model = board_info.as_ref().map_or("unknown", |i| i.model.as_str()),
+        mem = board_info.as_ref().map_or(0..0, |i| i.mem.clone()),
+        dtb = board_info.as_ref().map_or(0..0, |i| i.dtb.clone()),
         ver_sbi = rustsbi::VERSION,
         logo = rustsbi::logo(),
         ver_impl = env!("CARGO_PKG_VERSION"),
         firmware = entry as usize,
     );
 
-    set_pmp(mem.clone());
-    hart_csr_utils::print_pmps();
-
-    let plic = unsafe { &*hal::pac::PLIC::ptr() };
-    use hal::pac::plic::ctrl::CTRL_A;
-    plic.ctrl.write(|w| w.ctrl().variant(CTRL_A::MS));
-
-    if meta.len_kernel() == 0 {
+    if kernel == 0 {
         arrow_walk()
     } else {
-        let dtb_addr = meta.dtb().map_or(0, |s| s.as_ptr() as usize);
-        println!("execute_supervisor at {SUPERVISOR_ENTRY:#x} with a1 = {dtb_addr:#x}");
+        const DEFAULT: Range<usize> = memory::DRAM..memory::DRAM + (512 << 20);
+        let mem = board_info.as_ref().map_or(DEFAULT, |i| i.mem.clone());
+        set_pmp(mem, kernel);
+        hart_csr_utils::print_pmps();
+
+        let plic = unsafe { &*hal::pac::PLIC::ptr() };
+        use hal::pac::plic::ctrl::CTRL_A;
+        plic.ctrl.write(|w| w.ctrl().variant(CTRL_A::MS));
+
+        let dtb = board_info.as_ref().map_or(0, |i| i.dtb.start);
+        println!("execute_supervisor at {kernel:#x} with a1 = {dtb:#x}");
         execute_supervisor(Supervisor {
-            start_addr: SUPERVISOR_ENTRY,
-            opaque: dtb_addr,
+            start_addr: kernel,
+            opaque: dtb,
         })
     }
 }
 
 /// 设置 PMP。
-fn set_pmp(mem: core::ops::Range<usize>) {
+fn set_pmp(mem: core::ops::Range<usize>, kernel: usize) {
     use riscv::register::{pmpaddr0, pmpaddr1, pmpaddr2, pmpaddr3, pmpcfg0, Permission, Range};
     unsafe {
         pmpcfg0::set_pmp(0, Range::OFF, Permission::NONE, false);
@@ -128,7 +130,7 @@ fn set_pmp(mem: core::ops::Range<usize>) {
         pmpaddr1::write(mem.start >> 2);
         // SBI
         pmpcfg0::set_pmp(2, Range::TOR, Permission::NONE, false);
-        pmpaddr2::write(SUPERVISOR_ENTRY >> 2);
+        pmpaddr2::write(kernel >> 2);
         //主存
         pmpcfg0::set_pmp(3, Range::TOR, Permission::RWX, false);
         pmpaddr3::write(mem.end >> 2);
@@ -165,13 +167,11 @@ unsafe fn set_mtvec(trap_handler: usize) {
     mtvec::write(trap_handler, mtvec::TrapMode::Direct);
 }
 
-fn parse_board_info(slice: &[u8]) -> Option<BoardInfo> {
+fn parse_board_info(addr: usize) -> Option<BoardInfo> {
     use dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
 
-    let ptr = slice.as_ptr();
-    let addr = ptr as usize;
     let dtb = unsafe {
-        match Dtb::from_raw_parts_filtered(ptr, |e| matches!(e, LastCompVersion(16))) {
+        match Dtb::from_raw_parts_filtered(addr as _, |e| matches!(e, LastCompVersion(16))) {
             Ok(dtb) => dtb,
             Err(e) => {
                 println!("Dtb not detected at {addr:#x}: {e:?}");

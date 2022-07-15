@@ -2,6 +2,12 @@
 
 哪吒引导和引导程序调试工具。
 
+## 模块
+
+### SPL
+
+运行在 SRAM，单独调试时产生如下输出：
+
 ```text
 DRAM only have internal ZQ!!
 get_pmu_exist() = 4294967295
@@ -28,47 +34,40 @@ DRAM simple test OK.
   / |/ /__ ___ / /  ___ _  / _ )___  ___  / /_  / / / / /_(_) /
  /    / -_)_ // _ \/ _ `/ / _  / _ \/ _ \/ __/ / /_/ / __/ / /
 /_/|_/\__//__/_//_/\_,_/ /____/\___/\___/\__/  \____/\__/_/_/🦀
-NAND flash: c2 26 3
-no payload[>>                                    ]
+no payload |                     <<                           |
 ```
 
-## 功能
+### SEE
 
-- `cargo asm [--stage <sram/dram>] [--output <path>]`
+运行在 DRAM，单独调试时产生如下输出：
 
-  反汇编目标文件并保存到指定位置。
+```text
+[rustsbi] no dtb file detected
+[rustsbi] RustSBI version 0.3.0-alpha.1, adapting to RISC-V SBI v1.0.0
+.______       __    __      _______.___________.  _______..______   __
+|   _  \     |  |  |  |    /       |           | /       ||   _  \ |  |
+|  |_)  |    |  |  |  |   |   (----`---|  |----`|   (----`|  |_)  ||  |
+|      /     |  |  |  |    \   \       |  |      \   \    |   _  < |  |
+|  |\  \----.|  `--'  |.----)   |      |  |  .----)   |   |  |_)  ||  |
+| _| `._____| \______/ |_______/       |__|  |_______/    |______/ |__|
+[rustsbi] Implementation     : RustSBI-D1 Version 0.1.0
+[rustsbi] Extensions         : [legacy console, timer, reset, ipi]
+[rustsbi] Platform Name      : unknown
+[rustsbi] Platform SMP       : 1
+[rustsbi] Platform Memory    : 0x0..0x0
+[rustsbi] Boot HART          : 0
+[rustsbi] Device Tree Region : 0x0..0x0
+[rustsbi] Firmware Address   : 0x40000000
+[rustsbi] Supervisor Address : 0x0
+[rustsbi] no kernel |                                      <<         |
+```
 
-  - 若 `--stage` 为空，两个阶段都会生成
-  - 若 `--output` 为空，保存在项目根目录
+## 加载过程
 
-- `cargo boot [--stage <sram/dram>] [--kernel <path>] [--dtb <path>]`
+支持以下模式：
 
-  通过 xfel 直接引导。
+1. xfel -> spl -> see -> kernel
+2. xfel --------> see -> kernel
+3. brom -> spl -> see -> kernel
 
-  - 若 `--stage` 选择 `sram`，将整个引导流程、内核文件和 dtb 文件全部烧写到 flash，然后从 sram 启动
-  - 若 `--stage` 选择 `dram`，将 see、kernel 和 dtb 文件放在 dram 合适的位置上，并从 dram 启动
-  - 若 `--stage` 为空，默认按 `dram` 执行
-
-- `cargo debug --stage <sram/dram>`
-
-  调试引导程序。
-
-- `cargo erase [--range <start..end/base[len]>]`
-
-  擦除部分 flash。
-
-  可以通过 `--range` 传入擦除的范围，如果不传将擦除负载元数据（payload meta）。
-
-## 引导程序设计
-
-### 存储
-
-|     Stage    |    Memory   | Flash
-|--------------|-------------|--------
-|      SPL     |    0x2_0000 |    0x0
-| Payload Meta |    0x2_40c8 | 0x8000
-|      SEE     | 0x4000_0000 | 0x9000
-|    KERNEL    | 0x4020_0000 | +sizeof(SEE)/4k
-|      DTB     |      *      | +sizeof(KERNEL)/4k
-
-> DTB 被放在 DTB 描述的物理内存区域的最后一个 2 MiB 页上，同时偏移存入 Meta
+每种模式都支持在没有后续环节时停住。
