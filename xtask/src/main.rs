@@ -1,5 +1,5 @@
-mod asm;
 // mod xfel;
+mod components;
 
 #[macro_use]
 extern crate clap;
@@ -7,15 +7,13 @@ extern crate clap;
 #[macro_use]
 extern crate log;
 
-use asm::AsmArg;
 use clap::Parser;
-use command_ext::{BinUtil, Cargo, CommandExt, Ext};
+use command_ext::{BinUtil, Cargo, CommandExt};
+use components::Components;
 use once_cell::sync::Lazy;
 use std::{
     error::Error,
-    ffi::OsStr,
-    fs::{self, File},
-    io::{Error as IoError, ErrorKind as IoErrorKind},
+    fs::File,
     path::{Path, PathBuf},
 };
 
@@ -51,12 +49,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     use Commands::*;
     let cli = Cli::parse();
     match cli.command {
-        Make => make(cli.components).is_ok(),
-        Asm(arg) => arg.asm(cli.components),
+        Make => cli.components.make().map(|_| ()),
+        Asm(arg) => cli.components.asm(arg),
         Debug => todo!(),
         Flash => todo!(),
-    };
-    Ok(())
+    }
 }
 
 struct Dirs {
@@ -100,13 +97,19 @@ impl Package {
         DIRS.target.join(self.name())
     }
 
-    fn objdump(&self) -> Vec<u8> {
+    fn objdump(&self, path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
         self.build();
-        BinUtil::objdump()
-            .arg(self.target())
-            .arg("-d")
-            .output()
-            .stdout
+        let path = path.as_ref();
+        info!("dump `{}` to {}", self.name(), path.display());
+        std::fs::write(
+            path,
+            BinUtil::objdump()
+                .arg(self.target())
+                .arg("-d")
+                .output()
+                .stdout,
+        )?;
+        Ok(())
     }
 
     fn objcopy(&self) -> PathBuf {
@@ -124,18 +127,6 @@ impl Package {
     }
 }
 
-#[derive(Args)]
-struct Components {
-    #[clap(long, global = true)]
-    spl: bool,
-    #[clap(long, global = true)]
-    see: bool,
-    #[clap(long, global = true)]
-    kernel: Option<PathBuf>,
-    #[clap(long, global = true)]
-    dt: Option<PathBuf>,
-}
-
 #[derive(Default)]
 struct Target {
     spl: Option<File>,
@@ -144,35 +135,8 @@ struct Target {
     dtb: Option<File>,
 }
 
-fn make(components: Components) -> Result<Target, Box<dyn Error>> {
-    let mut ans = Target::default();
-    if components.spl {
-        ans.spl.replace(fs::File::open(Package::Spl.objcopy())?);
-    }
-    if components.see {
-        ans.see.replace(fs::File::open(Package::See.objcopy())?);
-    }
-    if let Some(kernel) = components.kernel {
-        ans.kernel.replace(fs::File::open(kernel)?);
-    }
-    if let Some(dt) = components.dt {
-        if !dt.is_file() {
-            return Err(IoError::new(
-                IoErrorKind::NotFound,
-                format!("dt file \"{}\" not exist", dt.display()),
-            )
-            .into());
-        }
-        if dt.extension() == Some(OsStr::new("dts")) {
-            let dtb = DIRS
-                .target
-                .join(dt.file_stem().unwrap_or(OsStr::new("nezha")))
-                .with_extension("dtb");
-            Ext::new("dtc").arg("-o").arg(&dtb).arg(&dt).invoke();
-            ans.dtb.replace(fs::File::open(dtb)?);
-        } else {
-            ans.dtb.replace(fs::File::open(dt)?);
-        }
-    }
-    Ok(ans)
+#[derive(Args)]
+struct AsmArg {
+    #[clap(short, long)]
+    output: Option<PathBuf>,
 }
