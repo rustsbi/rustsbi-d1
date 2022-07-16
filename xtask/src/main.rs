@@ -1,5 +1,5 @@
 mod asm;
-mod xfel;
+// mod xfel;
 
 #[macro_use]
 extern crate clap;
@@ -7,16 +7,17 @@ extern crate clap;
 #[macro_use]
 extern crate log;
 
-use asm::AsmArgs;
+use asm::AsmArg;
 use clap::Parser;
-use command_ext::{BinUtil, Cargo, CommandExt};
+use command_ext::{BinUtil, Cargo, CommandExt, Ext};
 use once_cell::sync::Lazy;
 use std::{
     error::Error,
+    ffi::OsStr,
+    fs::{self, File},
+    io::{Error as IoError, ErrorKind as IoErrorKind},
     path::{Path, PathBuf},
-    str::FromStr,
 };
-use xfel::Xfel;
 
 #[derive(Parser)]
 #[clap(name = "NeZha Boot Util")]
@@ -24,14 +25,16 @@ use xfel::Xfel;
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
+    #[clap(flatten)]
+    components: Components,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    Asm(AsmArgs),
-    Boot,
-    Debug(DebugArg),
-    Erase(EraseArg),
+    Make,
+    Asm(AsmArg),
+    Debug,
+    Flash,
 }
 
 static DIRS: Lazy<Dirs> = Lazy::new(Dirs::new);
@@ -39,18 +42,19 @@ static DIRS: Lazy<Dirs> = Lazy::new(Dirs::new);
 fn main() -> Result<(), Box<dyn Error>> {
     use simplelog::*;
     TermLogger::init(
-        LevelFilter::Debug,
+        LevelFilter::Info,
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;
 
     use Commands::*;
-    match Cli::parse().command {
-        Asm(args) => args.asm(),
-        Boot => todo!(),
-        Debug(arg) => arg.debug(),
-        Erase(arg) => arg.erase(),
+    let cli = Cli::parse();
+    match cli.command {
+        Make => make(cli.components).is_ok(),
+        Asm(arg) => arg.asm(cli.components),
+        Debug => todo!(),
+        Flash => todo!(),
     };
     Ok(())
 }
@@ -71,41 +75,6 @@ impl Dirs {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Stage {
-    Sram,
-    Dram,
-}
-
-impl FromStr for Stage {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "sram" => Ok(Self::Sram),
-            "dram" => Ok(Self::Dram),
-            _ => Err("unknown stage"),
-        }
-    }
-}
-
-impl Stage {
-    #[inline]
-    const fn package(&self) -> Package {
-        match self {
-            Self::Sram => Package::Spl,
-            Self::Dram => Package::See,
-        }
-    }
-
-    #[inline]
-    const fn base_addr(&self) -> usize {
-        match self {
-            Stage::Sram => 0x0002_0000,
-            Stage::Dram => 0x4000_0000,
-        }
-    }
-}
-
 enum Package {
     Spl,
     See,
@@ -121,12 +90,8 @@ impl Package {
     }
 
     #[inline]
-    const fn both() -> [Self; 2] {
-        [Self::Spl, Self::See]
-    }
-
-    #[inline]
     fn build(&self) {
+        info!("building `{}`", self.name());
         Cargo::build().package(self.name()).release().invoke();
     }
 
@@ -148,6 +113,7 @@ impl Package {
         self.build();
         let target = self.target();
         let bin = target.with_extension("bin");
+        info!("strip `{}` to {}", self.name(), bin.display());
         BinUtil::objcopy()
             .arg("--binary-architecture=riscv64")
             .arg(target)
@@ -159,109 +125,54 @@ impl Package {
 }
 
 #[derive(Args)]
-struct DebugArg {
-    #[clap(long)]
-    stage: Stage,
+struct Components {
+    #[clap(long, global = true)]
+    spl: bool,
+    #[clap(long, global = true)]
+    see: bool,
+    #[clap(long, global = true)]
+    kernel: Option<PathBuf>,
+    #[clap(long, global = true)]
+    dt: Option<PathBuf>,
 }
 
-impl DebugArg {
-    fn debug(&self) -> bool {
-        let address = self.stage.base_addr();
-        let file = self.stage.package().objcopy();
-        if let Stage::Dram = self.stage {
-            Xfel::ddr("d1").invoke();
-            common::memory::Meta::DEFAULT
-                .as_u32s()
-                .into_iter()
-                .copied()
-                .enumerate()
-                .for_each(|(i, value)| {
-                    Xfel::write32(common::memory::META + i * 4, value).invoke();
-                });
-        }
-        info!("writing {} to {address:#x}", file.display());
-        Xfel::write(address, file).invoke();
-        info!("execute from {address:#x}");
-        Xfel::exec(address).invoke();
-        true
+#[derive(Default)]
+struct Target {
+    spl: Option<File>,
+    see: Option<File>,
+    kernel: Option<File>,
+    dtb: Option<File>,
+}
+
+fn make(components: Components) -> Result<Target, Box<dyn Error>> {
+    let mut ans = Target::default();
+    if components.spl {
+        ans.spl.replace(fs::File::open(Package::Spl.objcopy())?);
     }
-}
-
-#[derive(Args)]
-struct EraseArg {
-    #[clap(short, long)]
-    range: Option<String>,
-}
-
-impl EraseArg {
-    fn erase(&self) -> bool {
-        let range = match &self.range {
-            Some(s) => s,
-            None => {
-                const META: usize = common::flash::Meta::POS as _;
-                let range = META..META + 4096;
-                info!("erasing range: {range:#x?}");
-                Xfel::erase(range.start, range.len()).invoke();
-                return true;
-            }
-        };
-        let range = if let Some((start, end)) = range.split_once("..") {
-            let start = match parse_num(start) {
-                Some(val) => val,
-                None => {
-                    error!("failed to parse start \"{start}\"");
-                    return false;
-                }
-            };
-            let end = match parse_num(end) {
-                Some(val) => val,
-                None => {
-                    error!("failed to parse end \"{end}\"");
-                    return false;
-                }
-            };
-            start..end
-        } else if let Some(temp) = range.trim_end().strip_suffix(']') {
-            let (base, len) = match temp.split_once('[') {
-                Some(pair) => pair,
-                None => {
-                    error!("failed to split base and len: \"{temp}\"");
-                    return false;
-                }
-            };
-            let base = match parse_num(base) {
-                Some(val) => val,
-                None => {
-                    error!("failed to parse base \"{base}\"");
-                    return false;
-                }
-            };
-            let len = match parse_num(len) {
-                Some(val) => val,
-                None => {
-                    error!("failed to parse len \"{len}\"");
-                    return false;
-                }
-            };
-            base..base + len
+    if components.see {
+        ans.see.replace(fs::File::open(Package::See.objcopy())?);
+    }
+    if let Some(kernel) = components.kernel {
+        ans.kernel.replace(fs::File::open(kernel)?);
+    }
+    if let Some(dt) = components.dt {
+        if !dt.is_file() {
+            return Err(IoError::new(
+                IoErrorKind::NotFound,
+                format!("dt file \"{}\" not exist", dt.display()),
+            )
+            .into());
+        }
+        if dt.extension() == Some(OsStr::new("dts")) {
+            let dtb = DIRS
+                .target
+                .join(dt.file_stem().unwrap_or(OsStr::new("nezha")))
+                .with_extension("dtb");
+            Ext::new("dtc").arg("-o").arg(&dtb).arg(&dt).invoke();
+            ans.dtb.replace(fs::File::open(dtb)?);
         } else {
-            error!("cannot parse range: {range}");
-            return false;
-        };
-        if range.is_empty() {
-            error!("erasing range is empty {range:#x?}");
-            false
-        } else {
-            info!("erasing range: {range:#x?}");
-            Xfel::erase(range.start, range.len()).invoke();
-            true
+            ans.dtb.replace(fs::File::open(dt)?);
         }
     }
-}
-
-fn parse_num(s: &str) -> Option<usize> {
-    match s.trim_start().strip_prefix("0x") {
-        Some(s) => usize::from_str_radix(s, 16).ok(),
-        None => usize::from_str_radix(s, 10).ok(),
-    }
+    Ok(ans)
 }

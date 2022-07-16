@@ -71,3 +71,19 @@ no payload |                     <<                           |
 3. brom -> spl -> see -> kernel
 
 每种模式都支持在没有后续环节时停住。
+
+## 命令
+
+环境参数：
+
+- `--spl` 调试 spl
+- `--see` 调试 see
+- `--kernel <file>` 过程包含指定的特权程序二进制文件
+- `--dt <file>` 过程包含指定的设备树文件
+
+命令：
+
+- **`cargo make`**
+- **`cargo asm`**
+- **`cargo debug`**
+- **`cargo flash`**

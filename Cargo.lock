@@ -45,9 +45,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "3.2.10"
+version = "3.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c5a7f9997be616e47f0577ee38c91decb33392c5be4866494f34cdf329a9aa"
+checksum = "ab8b79fe3946ceb4a0b1c080b4018992b8d27e9ff363644c1c9b6387c854614d"
 dependencies = [
  "atty",
  "bitflags",
@@ -107,9 +107,9 @@ dependencies = [
 
 [[package]]
 name = "dtb-walker"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c85a84940f2e41c8907a4903c9991ab5dba8fa386386f2f91b94c1d678d8f423"
+checksum = "da7c41cf8cee950296756ba4623e8d46acdbb75d3b663e4f9a4d78fcc6e43fa0"
 
 [[package]]
 name = "embedded-hal"
