@@ -16,6 +16,5 @@ rustsbi = { git = "https://github.com/rustsbi/rustsbi", rev = "af60b02", feature
 ] }
 riscv = "0.8"
 r0 = "1"
-dtb-walker = "0.2.0-alpha.1"
 hal = { path = "../hal" }
 common = { path = "../common" }

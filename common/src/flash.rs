@@ -28,8 +28,14 @@ macro_rules! read_payload {
 impl Meta {
     pub const POS: u32 = 0x8000;
 
+    /// 构造一个未初始化的 flash 元数据。
+    ///
+    /// # Safety
+    ///
+    /// 生成的对象具有随机初始值。
     #[inline]
     pub const unsafe fn uninit() -> Self {
+        #[allow(clippy::uninit_assumed_init)]
         core::mem::MaybeUninit::uninit().assume_init()
     }
 

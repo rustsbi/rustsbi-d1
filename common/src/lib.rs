@@ -4,6 +4,7 @@ mod arrow;
 pub mod flash;
 pub mod memory;
 
+pub extern crate dtb_walker;
 pub use arrow::Arrow;
 use core::ops::Range;
 

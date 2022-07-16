@@ -23,21 +23,9 @@ impl Xfel {
     }
 
     #[inline]
-    pub fn version() -> Self {
-        Self::new(["version"])
-    }
-
-    #[inline]
     pub fn write(address: usize, file: impl AsRef<Path>) -> Self {
         let mut ans = Self::new(["write"]);
         ans.arg(format!("{address:#x}")).arg(file.as_ref());
-        ans
-    }
-
-    #[inline]
-    pub fn write32(address: usize, value: u32) -> Self {
-        let mut ans = Self::new(["write32"]);
-        ans.arg(format!("{address:#x}")).arg(format!("{value:#x}"));
         ans
     }
 
@@ -51,13 +39,6 @@ impl Xfel {
     #[inline]
     pub fn ddr(ty: &str) -> Self {
         Self::new(["ddr", ty])
-    }
-
-    #[inline]
-    pub fn erase(address: usize, length: usize) -> Self {
-        let mut ans = Self::new(["spinand", "erase"]);
-        ans.arg(format!("{address:#x}")).arg(format!("{length}"));
-        ans
     }
 }
 

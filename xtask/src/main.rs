@@ -1,5 +1,5 @@
-// mod xfel;
 mod components;
+mod xfel;
 
 #[macro_use]
 extern crate clap;
@@ -13,7 +13,7 @@ use components::Components;
 use once_cell::sync::Lazy;
 use std::{
     error::Error,
-    fs::File,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli.command {
         Make => cli.components.make().map(|_| ()),
         Asm(arg) => cli.components.asm(arg),
-        Debug => todo!(),
+        Debug => cli.components.debug(),
         Flash => todo!(),
     }
 }
@@ -88,7 +88,7 @@ impl Package {
 
     #[inline]
     fn build(&self) {
-        info!("building `{}`", self.name());
+        info!("build `{}`", self.name());
         Cargo::build().package(self.name()).release().invoke();
     }
 
@@ -129,14 +129,27 @@ impl Package {
 
 #[derive(Default)]
 struct Target {
-    spl: Option<File>,
-    see: Option<File>,
-    kernel: Option<File>,
-    dtb: Option<File>,
+    spl: Option<PathBuf>,
+    see: Option<PathBuf>,
+    kernel: Option<PathBuf>,
+    dtb: Option<PathBuf>,
 }
 
 #[derive(Args)]
 struct AsmArg {
     #[clap(short, long)]
     output: Option<PathBuf>,
+}
+
+#[derive(Debug)]
+enum XError {
+    InvalidProcedure(String),
+}
+
+impl Error for XError {}
+
+impl Display for XError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }

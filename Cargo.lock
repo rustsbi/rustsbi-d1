@@ -93,6 +93,9 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
+dependencies = [
+ "dtb-walker",
+]
 
 [[package]]
 name = "d1-pac"
@@ -312,7 +315,6 @@ name = "see"
 version = "0.1.0"
 dependencies = [
  "common",
- "dtb-walker",
  "hal",
  "r0",
  "riscv",
@@ -335,7 +337,6 @@ name = "spl"
 version = "0.1.0"
 dependencies = [
  "common",
- "dtb-walker",
  "hal",
  "r0",
 ]

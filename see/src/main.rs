@@ -168,7 +168,7 @@ unsafe fn set_mtvec(trap_handler: usize) {
 }
 
 fn parse_board_info(addr: usize) -> Option<BoardInfo> {
-    use dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
+    use common::dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
 
     let dtb = unsafe {
         match Dtb::from_raw_parts_filtered(addr as _, |e| matches!(e, LastCompVersion(16))) {

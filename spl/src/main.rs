@@ -6,9 +6,8 @@ mod flash;
 mod logging;
 mod magic;
 
+use common::memory::*;
 use core::{arch::asm, panic::PanicInfo};
-
-use common::memory::DRAM;
 
 #[naked]
 #[no_mangle]
@@ -48,7 +47,7 @@ unsafe extern "C" fn main_jump() -> ! {
 }
 
 #[link_section = ".head.meta"]
-static mut META: common::memory::Meta = common::memory::Meta::DEFAULT;
+static mut META: Meta = Meta::DEFAULT;
 
 /// Jump over head data to executable code.
 ///
@@ -137,7 +136,6 @@ unsafe extern "C" fn head_swap() {
 }
 
 extern "C" fn main() -> usize {
-    use common::memory;
     use flash::SpiNand;
     use hal::{
         ccu::Clocks,
@@ -198,24 +196,23 @@ extern "C" fn main() -> usize {
     };
     // 拷贝 dtb
     if let Some((base, len)) = meta.dtb() {
-        const DTB: usize = memory::DRAM;
-        flash.copy_into(base, unsafe { static_buf(DTB, len) });
-        let offset = memory::dtb_offset(parse_memory_size(DTB));
-        unsafe { META.dtb = offset as _ };
-        let dst = (memory::DRAM + offset) as *mut u8;
-        unsafe { dst.copy_from_nonoverlapping(DTB as *const u8, len) };
+        flash.copy_into(base, unsafe { static_buf(DRAM, len) });
+        let offset = dtb_offset(parse_memory_size(DRAM as _));
+        unsafe { META.dtb = offset };
+        let dst = (DRAM as u32 + offset) as *mut u8;
+        unsafe { dst.copy_from_nonoverlapping(DRAM as *const u8, len) };
     }
     // 拷贝 see
-    flash.copy_into(see_pos, unsafe { static_buf(memory::DRAM, see_len) });
+    flash.copy_into(see_pos, unsafe { static_buf(DRAM, see_len) });
     unsafe { META.dtb = 0 };
     // 拷贝 kernel
     if let Some((base, len)) = meta.kernel() {
-        flash.copy_into(base, unsafe { static_buf(memory::KERNEL, len) });
-        unsafe { META.dtb = (memory::KERNEL - memory::DRAM) as _ };
+        flash.copy_into(base, unsafe { static_buf(KERNEL, len) });
+        unsafe { META.dtb = (KERNEL - DRAM) as _ };
     }
     // 跳转
-    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(memory::DRAM) << Endl;
-    memory::DRAM
+    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(DRAM) << Endl;
+    DRAM
 }
 
 const LOGO: &str = r"
@@ -263,21 +260,4 @@ fn arrow_walk() -> ! {
             core::hint::spin_loop();
         }
     }
-}
-
-fn parse_memory_size(addr: usize) -> usize {
-    use dtb_walker::{Dtb, DtbObj, HeaderError::*, Property, WalkOperation::*};
-
-    let mut ans = 0usize;
-    unsafe { Dtb::from_raw_parts_filtered(addr as _, |e| matches!(e, LastCompVersion(16))) }
-        .unwrap()
-        .walk(|path, obj| match obj {
-            DtbObj::SubNode { name } if path.is_root() && name.starts_with("memory") => StepInto,
-            DtbObj::Property(Property::Reg(mut reg)) if path.last().starts_with("memory") => {
-                ans = reg.next().unwrap().len();
-                Terminate
-            }
-            _ => StepOver,
-        });
-    ans
 }
