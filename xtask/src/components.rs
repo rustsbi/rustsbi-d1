@@ -23,12 +23,15 @@ pub(crate) struct Components {
 impl Components {
     pub fn make(&self) -> Result<Target, Box<dyn Error>> {
         let mut ans = Target::default();
+        // 生成 spl
         if self.spl {
             ans.spl.replace(Package::Spl.objcopy());
         }
+        // 生成 see
         if self.see {
             ans.see.replace(Package::See.objcopy());
         }
+        // 检查 kernel 文件是否存在
         if let Some(kernel) = &self.kernel {
             if !kernel.is_file() {
                 return Err(IoError::new(
@@ -39,6 +42,7 @@ impl Components {
             }
             ans.kernel.replace(kernel.clone());
         }
+        // 生成 dtb
         if let Some(dt) = &self.dt {
             if !dt.is_file() {
                 return Err(IoError::new(
@@ -134,7 +138,7 @@ impl Components {
             Xfel::write(DRAM, see).invoke();
             // 写入 kernel
             if let Some(kernel) = &target.kernel {
-                meta.set_see((KERNEL - DRAM) as _);
+                meta.set_kernel((KERNEL - DRAM) as _);
                 info!("write {} to {KERNEL:#x}", kernel.display());
                 Xfel::write(KERNEL, kernel).invoke();
             }

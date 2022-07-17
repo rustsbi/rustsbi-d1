@@ -67,8 +67,14 @@ no payload |                     <<                           |
 支持以下模式：
 
 1. xfel -> spl -> see -> kernel
+
+   > 这个模式目前不能工作，因为一旦使用 `xfel ddr d1`，就没法从 sram 运行了，原因不明
+
 2. xfel --------> see -> kernel
+
 3. brom -> spl -> see -> kernel
+
+   > 尚未实现
 
 每种模式都支持在没有后续环节时停住。
 
@@ -76,14 +82,45 @@ no payload |                     <<                           |
 
 环境参数：
 
-- `--spl` 调试 spl
-- `--see` 调试 see
-- `--kernel <file>` 过程包含指定的特权程序二进制文件
-- `--dt <file>` 过程包含指定的设备树文件
+- `--spl`
+- `--see`
+- `--kernel <file>`
+- `--dt <file>`
 
 命令：
 
 - **`cargo make`**
+
+  生成各阶段目标文件。
+
+  示例：
+
+  - `cargo make --spl` 生成 spl.bin
+  - `cargo make --spl --see` 生成 spl.bin 和 see.bin
+  - `cargo make --spl --see --dt nezha.dts` 生成 spl.bin、see.bin 和 nezha.dtb
+
 - **`cargo asm`**
+
+  生成各阶段反汇编文件。
+
+  > **NOTICE**
+  >
+  > - `cargo asm` 视作 `cargo asm --spl --see`
+  > - `--kernel` 和 `--dt` 目前无效
+
 - **`cargo debug`**
+
+  调试，不使用 flash。
+
+  示例：
+
+  - `cargo debug --spl` 调试 spl
+  - `cargo debug --see` 调试 see
+  - `cargo debug --see --dt nezha.dts` 调试可见设备树文件的 see
+  - `cargo debug --see --kernel zcore.bin --dt nezha.dts` 调试 see + kernel
+
 - **`cargo flash`**
+
+  烧写到 flash。
+
+  > **NOTICE** 未实现。预计各个参数将是独立的以支持部分烧写，加快烧写速度。

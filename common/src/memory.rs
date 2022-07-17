@@ -5,8 +5,8 @@ pub const META: usize = 0x0002_0068;
 
 #[inline]
 pub fn dtb_offset(mem_size: usize) -> u32 {
-    const MASK: u32 = (2 << 20) - 1;
-    (((mem_size as u32).min(1 << 30) - 1) + MASK) & !MASK
+    const PAGE: u32 = 2 << 20;
+    ((mem_size as u32).min(1 << 30) - PAGE) & !(PAGE - 1)
 }
 
 #[repr(C)]
