@@ -1,7 +1,6 @@
 ﻿use crate::{xfel::Xfel, AsmArg, Package, Target, XError, DIRS};
 use command_ext::{CommandExt, Ext};
 use std::{
-    error::Error,
     ffi::OsStr,
     fs::{self, File},
     io::{Error as IoError, ErrorKind as IoErrorKind, Read},
@@ -21,7 +20,7 @@ pub(crate) struct Components {
 }
 
 impl Components {
-    pub fn make(&self) -> Result<Target, Box<dyn Error>> {
+    pub fn make(&self) -> Result<Target, XError> {
         let mut ans = Target::default();
         // 生成 spl
         if self.spl {
@@ -65,7 +64,7 @@ impl Components {
         Ok(ans)
     }
 
-    pub fn asm(&self, arg: AsmArg) -> Result<(), Box<dyn Error>> {
+    pub fn asm(&self, arg: AsmArg) -> Result<(), XError> {
         let mut packages = vec![];
         if self.spl {
             packages.push(Package::Spl);
@@ -114,18 +113,18 @@ impl Components {
         }
     }
 
-    pub fn debug(&self) -> Result<(), Box<dyn Error>> {
+    pub fn debug(&self) -> Result<(), XError> {
         use common::memory::*;
         // FIXME 通过 xfel 初始化 ddr 之后 sram 就不能用了
         if self.spl && self.see {
-            return Err(
-                XError::InvalidProcedure("debuging spl + see is not supported now".into()).into(),
-            );
+            return Err(XError::InvalidProcedure(
+                "debuging spl + see is not supported now".into(),
+            ));
         }
         if !self.see && self.kernel.is_some() {
-            return Err(
-                XError::InvalidProcedure("cannot debuging kernel without see".into()).into(),
-            );
+            return Err(XError::InvalidProcedure(
+                "cannot debuging kernel without see".into(),
+            ));
         }
         // 生成
         let target = self.make()?;
@@ -176,5 +175,9 @@ impl Components {
         info!("exec from {entry:#x}");
         Xfel::exec(entry).invoke();
         Ok(())
+    }
+
+    pub fn flash(&self) -> Result<(), XError> {
+        todo!()
     }
 }

@@ -8,6 +8,7 @@ extern crate clap;
 extern crate log;
 
 use clap::Parser;
+use clap_verbosity_flag::Verbosity;
 use command_ext::{BinUtil, Cargo, CommandExt};
 use components::Components;
 use once_cell::sync::Lazy;
@@ -25,6 +26,8 @@ struct Cli {
     command: Commands,
     #[clap(flatten)]
     components: Components,
+    #[clap(flatten)]
+    verbose: Verbosity,
 }
 
 #[derive(Subcommand)]
@@ -37,22 +40,19 @@ enum Commands {
 
 static DIRS: Lazy<Dirs> = Lazy::new(Dirs::new);
 
-fn main() -> Result<(), Box<dyn Error>> {
-    use simplelog::*;
-    TermLogger::init(
-        LevelFilter::Info,
-        Config::default(),
-        TerminalMode::Mixed,
-        ColorChoice::Auto,
-    )?;
+fn main() -> Result<(), XError> {
+    let cli = Cli::parse();
+
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     use Commands::*;
-    let cli = Cli::parse();
     match cli.command {
         Make => cli.components.make().map(|_| ()),
         Asm(arg) => cli.components.asm(arg),
         Debug => cli.components.debug(),
-        Flash => todo!(),
+        Flash => cli.components.flash(),
     }
 }
 
@@ -97,7 +97,7 @@ impl Package {
         DIRS.target.join(self.name())
     }
 
-    fn objdump(&self, path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+    fn objdump(&self, path: impl AsRef<Path>) -> Result<(), XError> {
         self.build();
         let path = path.as_ref();
         info!("dump `{}` to {}", self.name(), path.display());
@@ -144,6 +144,7 @@ struct AsmArg {
 #[derive(Debug)]
 enum XError {
     InvalidProcedure(String),
+    IoError(std::io::Error),
 }
 
 impl Error for XError {}
@@ -151,5 +152,12 @@ impl Error for XError {}
 impl Display for XError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+impl From<std::io::Error> for XError {
+    #[inline]
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
     }
 }
