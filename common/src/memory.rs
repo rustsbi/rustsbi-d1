@@ -32,6 +32,8 @@ macro_rules! read_payload {
     };
 }
 
+impl crate::AsBinary for Meta {}
+
 impl Meta {
     pub const DEFAULT: Self = Self {
         from_flash: false,
@@ -53,13 +55,6 @@ impl Meta {
                 self as *const _ as *const u32,
                 core::mem::size_of::<Self>() / 4,
             )
-        }
-    }
-
-    #[inline]
-    pub const fn as_bytes(&self) -> &[u8] {
-        unsafe {
-            core::slice::from_raw_parts(self as *const _ as *const u8, core::mem::size_of::<Self>())
         }
     }
 
@@ -92,7 +87,7 @@ pub fn parse_memory_size(ptr: *const u8) -> usize {
         .unwrap()
         .walk(|path, obj| match obj {
             DtbObj::SubNode { name } if path.is_root() && name.starts_with("memory") => StepInto,
-            DtbObj::Property(Property::Reg(mut reg)) if path.last().starts_with("memory") => {
+            DtbObj::Property(Property::Reg(mut reg)) if path.name().starts_with("memory") => {
                 ans = reg.next().unwrap().len();
                 Terminate
             }

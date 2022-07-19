@@ -204,7 +204,7 @@ fn parse_board_info(addr: usize) -> Option<BoardInfo> {
                 StepOver
             }
         }
-        DtbObj::Property(Property::Reg(mut reg)) if path.last().starts_with("memory") => {
+        DtbObj::Property(Property::Reg(mut reg)) if path.name().starts_with("memory") => {
             ans.mem = reg.next().unwrap();
             if any {
                 Terminate

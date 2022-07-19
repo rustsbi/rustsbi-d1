@@ -144,6 +144,7 @@ struct AsmArg {
 #[derive(Debug)]
 enum XError {
     InvalidProcedure(String),
+    InvalidStamp,
     IoError(std::io::Error),
 }
 

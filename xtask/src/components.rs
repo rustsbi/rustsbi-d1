@@ -1,9 +1,10 @@
 ﻿use crate::{xfel::Xfel, AsmArg, Package, Target, XError, DIRS};
 use command_ext::{CommandExt, Ext};
+use common::uninit;
 use std::{
     ffi::OsStr,
     fs::{self, File},
-    io::{Error as IoError, ErrorKind as IoErrorKind, Read},
+    io::{Error as IoError, ErrorKind as IoErrorKind, Read, Seek, SeekFrom},
     path::PathBuf,
 };
 
@@ -24,7 +25,19 @@ impl Components {
         let mut ans = Target::default();
         // 生成 spl
         if self.spl {
-            ans.spl.replace(Package::Spl.objcopy());
+            use common::{AsBinary, EgonHead};
+            let mut file = File::open(ans.spl.insert(Package::Spl.objcopy()))?;
+            // 校验 stamp
+            let mut egonhead = unsafe { uninit::<EgonHead>() };
+            file.seek(SeekFrom::Start(4))?;
+            file.read_exact(egonhead.as_buf())?;
+            if egonhead.checksum != EgonHead::DEFAULT.checksum {
+                error!(
+                    "wrong stamp value {:#x}; check your generated blob and try again",
+                    egonhead.checksum
+                );
+                return Err(XError::InvalidStamp);
+            }
         }
         // 生成 see
         if self.see {
@@ -114,7 +127,7 @@ impl Components {
     }
 
     pub fn debug(&self) -> Result<(), XError> {
-        use common::memory::*;
+        use common::{memory::*, AsBinary};
         // FIXME 通过 xfel 初始化 ddr 之后 sram 就不能用了
         if self.spl && self.see {
             return Err(XError::InvalidProcedure(
@@ -167,7 +180,7 @@ impl Components {
         };
         // 写入元数据
         let meta_bytes = meta.as_bytes();
-        let meta = DIRS.target.join("meta.bin");
+        let meta = DIRS.target.join("meta_ram.bin");
         fs::write(&meta, meta_bytes)?;
         info!("write {} to {META:#x}", meta.display());
         Xfel::write(META, meta).invoke();
@@ -178,6 +191,54 @@ impl Components {
     }
 
     pub fn flash(&self) -> Result<(), XError> {
-        todo!()
+        use common::{flash::*, AsBinary};
+
+        const META: u32 = Meta::POS; // 32 KiB
+        const SEE: u32 = 2 << 20; // 2 MiB
+        const DTB: u32 = 4 << 20; // 4 MiB
+        const KERNEL: u32 = 6 << 20; // 6 MiB
+
+        let target = self.make()?;
+
+        if let Some(spl) = target.spl {
+            use common::EgonHead;
+
+            let mut file = fs::read(&spl)?;
+            unsafe { &mut *(file[4..].as_mut_ptr() as *mut EgonHead) }.length = file.len() as _;
+            let checksum =
+                unsafe { core::slice::from_raw_parts(file.as_ptr() as *const u32, file.len() / 4) }
+                    .iter()
+                    .copied()
+                    .reduce(|a, b| a.wrapping_add(b))
+                    .unwrap();
+            unsafe { &mut *(file[4..].as_mut_ptr() as *mut EgonHead) }.checksum = checksum;
+            let checked = spl.with_file_name("spl.checked.bin");
+            fs::write(&checked, file).unwrap();
+            Xfel::spinand_write(0, checked).invoke();
+        }
+
+        let meta_path = DIRS.target.join("meta_flash.bin");
+        let mut meta = unsafe { Meta::uninit() };
+
+        Xfel::spinand_read(META as _, Meta::LEN as _, &meta_path).invoke();
+        File::open(&meta_path)?.read_exact(meta.as_buf())?;
+
+        if let Some(see) = target.see {
+            meta.set_see(SEE, see.metadata().unwrap().len() as _);
+            Xfel::spinand_write(SEE as _, see).invoke();
+        }
+        if let Some(kernel) = target.kernel {
+            meta.set_kernel(KERNEL, kernel.metadata().unwrap().len() as _);
+            Xfel::spinand_write(KERNEL as _, kernel).invoke();
+        }
+        if let Some(dtb) = target.dtb {
+            meta.set_dtb(DTB, dtb.metadata().unwrap().len() as _);
+            Xfel::spinand_write(DTB as _, dtb).invoke();
+        }
+        fs::write(&meta_path, meta.as_bytes()).unwrap();
+        Xfel::spinand_write(META as _, meta_path).invoke();
+
+        Xfel::reset().invoke();
+        Ok(())
     }
 }

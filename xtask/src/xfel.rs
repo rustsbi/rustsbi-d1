@@ -40,6 +40,30 @@ impl Xfel {
     pub fn ddr(ty: &str) -> Self {
         Self::new(["ddr", ty])
     }
+
+    #[inline]
+    pub fn reset() -> Self {
+        Self::new(["reset"])
+    }
+
+    #[inline]
+    pub fn spinand_read(address: usize, length: usize, file: impl AsRef<Path>) -> Self {
+        let mut ans = Self::new(["spinand"]);
+        ans.arg("read")
+            .arg(format!("{address:#x}"))
+            .arg(format!("{length:#x}"))
+            .arg(file.as_ref());
+        ans
+    }
+
+    #[inline]
+    pub fn spinand_write(address: usize, file: impl AsRef<Path>) -> Self {
+        let mut ans = Self::new(["spinand"]);
+        ans.arg("write")
+            .arg(format!("{address:#x}"))
+            .arg(file.as_ref());
+        ans
+    }
 }
 
 fn detect_xfel() -> PathBuf {

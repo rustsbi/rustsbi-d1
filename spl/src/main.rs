@@ -6,7 +6,11 @@ mod flash;
 mod logging;
 mod magic;
 
-use common::memory::*;
+use common::{
+    flash::Meta as FlashMeta,
+    memory::{dtb_offset, parse_memory_size, Meta as MemMeta, DRAM, KERNEL},
+    AsBinary, EgonHead,
+};
 use core::{arch::asm, panic::PanicInfo};
 
 #[naked]
@@ -22,22 +26,9 @@ unsafe extern "C" fn head_jump() -> ! {
     )
 }
 
-const STAMP_CHECKSUM: u32 = 0x5F0A6C39;
-
 #[no_mangle]
 #[link_section = ".head.egon"]
-static EGON_HEAD: EgonHead = EgonHead {
-    magic: *b"eGON.BT0",
-    checksum: STAMP_CHECKSUM, // real checksum filled by blob generator
-    length: 0,                // real size filled by blob generator
-    _head_size: 0,
-    fel_script_address: 0,
-    fel_uenv_length: 0,
-    dt_name_offset: 0,
-    dram_size: 0,
-    boot_media: 0,
-    string_pool: [0; 13],
-};
+static EGON_HEAD: EgonHead = EgonHead::DEFAULT;
 
 #[naked]
 #[no_mangle]
@@ -47,7 +38,7 @@ unsafe extern "C" fn main_jump() -> ! {
 }
 
 #[link_section = ".head.meta"]
-static mut META: Meta = Meta::DEFAULT;
+static mut META: MemMeta = MemMeta::DEFAULT;
 
 /// Jump over head data to executable code.
 ///
@@ -187,8 +178,8 @@ extern "C" fn main() -> usize {
     }
     let _ = Out << Endl;
     // 读取 meta
-    let mut meta = unsafe { common::flash::Meta::uninit() };
-    flash.copy_into(common::flash::Meta::POS, meta.as_buf());
+    let mut meta = unsafe { FlashMeta::uninit() };
+    flash.copy_into(FlashMeta::POS, meta.as_buf());
     // 如果 see 不存在，停在此阶段
     let (see_pos, see_len) = match meta.see() {
         Some(pair) => pair,
@@ -220,20 +211,6 @@ const LOGO: &str = r"
   / |/ /__ ___ / /  ___ _  / _ )___  ___  / /_  / / / / /_(_) /
  /    / -_)_ // _ \/ _ `/ / _  / _ \/ _ \/ __/ / /_/ / __/ / /
 /_/|_/\__//__/_//_/\_,_/ /____/\___/\___/\__/  \____/\__/_/_/🦀";
-
-#[repr(C)]
-pub struct EgonHead {
-    magic: [u8; 8],
-    checksum: u32,
-    length: u32,
-    _head_size: u32,
-    fel_script_address: u32,
-    fel_uenv_length: u32,
-    dt_name_offset: u32,
-    dram_size: u32,
-    boot_media: u32,
-    string_pool: [u32; 13],
-}
 
 #[cfg_attr(not(test), panic_handler)]
 fn panic(_info: &PanicInfo) -> ! {

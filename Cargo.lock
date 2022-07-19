@@ -129,9 +129,9 @@ dependencies = [
 
 [[package]]
 name = "dtb-walker"
-version = "0.2.0-alpha.2"
+version = "0.2.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da7c41cf8cee950296756ba4623e8d46acdbb75d3b663e4f9a4d78fcc6e43fa0"
+checksum = "9404d41caa1aa659f7be44d5a902e318c0672900822fe9ca41d9e38c14b52332"
 
 [[package]]
 name = "embedded-hal"
@@ -176,9 +176,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "607c8a29735385251a339424dd462993c0fed8fa09d378f259377df08c126022"
+checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "heck"
