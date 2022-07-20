@@ -193,18 +193,14 @@ impl Components {
     pub fn flash(&self) -> Result<(), XError> {
         use common::{flash::*, AsBinary};
 
-        const META: u32 = Meta::POS; // 32 KiB
-        const SEE: u32 = 2 << 20; // 2 MiB
-        const DTB: u32 = 4 << 20; // 4 MiB
-        const KERNEL: u32 = 6 << 20; // 6 MiB
-
         let target = self.make()?;
 
         if let Some(spl) = target.spl {
             use common::EgonHead;
-
-            let mut file = fs::read(&spl)?;
-            unsafe { &mut *(file[4..].as_mut_ptr() as *mut EgonHead) }.length = file.len() as _;
+            // 必须对齐到 16 KiB，实际只有 16 KiB 和 32 KiB 两种可能性，干脆直接 32 KiB
+            let mut file = [0u8; EgonHead::DEFAULT.length as _];
+            File::open(&spl).unwrap().read(&mut file)?;
+            // 计算并填写校验和
             let checksum =
                 unsafe { core::slice::from_raw_parts(file.as_ptr() as *const u32, file.len() / 4) }
                     .iter()
@@ -212,6 +208,7 @@ impl Components {
                     .reduce(|a, b| a.wrapping_add(b))
                     .unwrap();
             unsafe { &mut *(file[4..].as_mut_ptr() as *mut EgonHead) }.checksum = checksum;
+            // 保存文件
             let checked = spl.with_file_name("spl.checked.bin");
             fs::write(&checked, file).unwrap();
             Xfel::spinand_write(0, checked).invoke();
@@ -220,7 +217,7 @@ impl Components {
         let meta_path = DIRS.target.join("meta_flash.bin");
         let mut meta = unsafe { Meta::uninit() };
 
-        Xfel::spinand_read(META as _, Meta::LEN as _, &meta_path).invoke();
+        Xfel::spinand_read(META as _, Meta::SIZE, &meta_path).invoke();
         File::open(&meta_path)?.read_exact(meta.as_buf())?;
 
         if let Some(see) = target.see {
@@ -237,8 +234,8 @@ impl Components {
         }
         fs::write(&meta_path, meta.as_bytes()).unwrap();
         Xfel::spinand_write(META as _, meta_path).invoke();
-
-        Xfel::reset().invoke();
+        // 必然返回错误
+        assert!(!Xfel::reset().status().success());
         Ok(())
     }
 }

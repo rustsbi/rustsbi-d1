@@ -1,4 +1,9 @@
-﻿#[derive(Debug)]
+﻿pub const META: u32 = 2 << 20; // 2 MiB
+pub const SEE: u32 = 4 << 20; // 4 MiB
+pub const DTB: u32 = 6 << 20; // 6 MiB
+pub const KERNEL: u32 = 8 << 20; // 8 MiB
+
+#[derive(Debug)]
 #[repr(C)]
 pub struct Meta {
     see: MetaEntry,
@@ -37,8 +42,6 @@ macro_rules! read_payload {
 impl crate::AsBinary for Meta {}
 
 impl Meta {
-    pub const POS: u32 = 0x8000;
-    pub const LEN: u32 = core::mem::size_of::<Self>() as _;
     pub const DEFAULT: Self = Self {
         see: MetaEntry::DEFAULT,
         kernel: MetaEntry::DEFAULT,

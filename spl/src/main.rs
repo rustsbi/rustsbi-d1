@@ -7,7 +7,7 @@ mod logging;
 mod magic;
 
 use common::{
-    flash::Meta as FlashMeta,
+    flash::{Meta as FlashMeta, META as META_POS},
     memory::{dtb_offset, parse_memory_size, Meta as MemMeta, DRAM, KERNEL},
     AsBinary, EgonHead,
 };
@@ -179,7 +179,7 @@ extern "C" fn main() -> usize {
     let _ = Out << Endl;
     // 读取 meta
     let mut meta = unsafe { FlashMeta::uninit() };
-    flash.copy_into(FlashMeta::POS, meta.as_buf());
+    flash.copy_into(META_POS, meta.as_buf());
     // 如果 see 不存在，停在此阶段
     let (see_pos, see_len) = match meta.see() {
         Some(pair) => pair,

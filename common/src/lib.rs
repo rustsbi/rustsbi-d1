@@ -28,7 +28,7 @@ impl EgonHead {
     pub const DEFAULT: Self = Self {
         magic: *b"eGON.BT0",
         checksum: 0x5F0A6C39, // real checksum filled by blob generator
-        length: 0,            // real size filled by blob generator
+        length: 0x8000,
         _head_size: 0,
         fel_script_address: 0,
         fel_uenv_length: 0,
