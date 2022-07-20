@@ -1,4 +1,4 @@
-﻿use crate::{xfel::Xfel, AsmArg, Package, Target, XError, DIRS};
+﻿use crate::{xfel::Xfel, AsmArg, FlashArgs, Package, Target, XError, DIRS};
 use command_ext::{CommandExt, Ext};
 use common::uninit;
 use std::{
@@ -190,7 +190,7 @@ impl Components {
         Ok(())
     }
 
-    pub fn flash(&self) -> Result<(), XError> {
+    pub fn flash(&self, args: FlashArgs) -> Result<(), XError> {
         use common::{flash::*, memory, AsBinary};
 
         let target = self.make()?;
@@ -217,11 +217,13 @@ impl Components {
         }
 
         let meta_path = DIRS.target.join("meta_flash.bin");
-        let mut meta = unsafe { Meta::uninit() };
-
-        Xfel::spinand_read(META as _, Meta::SIZE, &meta_path).invoke();
-        File::open(&meta_path)?.read_exact(meta.as_buf())?;
-
+        let mut meta = Meta::DEFAULT;
+        // 如果不需要重置文件系统，则从 Flash 读取现有的元数据
+        if !args.reset {
+            Xfel::spinand_read(META as _, Meta::SIZE, &meta_path).invoke();
+            File::open(&meta_path)?.read_exact(meta.as_buf())?;
+        }
+        // 写各模块
         if let Some(see) = target.see {
             meta.set_see(SEE, see.metadata().unwrap().len() as _);
             Xfel::spinand_write(SEE as _, see).invoke();
@@ -234,10 +236,13 @@ impl Components {
             meta.set_dtb(DTB, dtb.metadata().unwrap().len() as _);
             Xfel::spinand_write(DTB as _, dtb).invoke();
         }
+        // 元数据写到文件，再从文件写到 flash
         fs::write(&meta_path, meta.as_bytes()).unwrap();
         Xfel::spinand_write(META as _, meta_path).invoke();
-        // 必然返回错误
-        assert!(!Xfel::reset().status().success());
+        // 重启，必然返回错误
+        if args.boot {
+            assert!(!Xfel::reset().status().success());
+        }
         Ok(())
     }
 }

@@ -101,6 +101,15 @@ no payload |                     <<                           |
 
   生成各阶段反汇编文件。
 
+  参数：
+
+  - `-o`/`--output` 文件保存位置，默认保存到 target 目录下。
+
+  示例：
+
+  - `cargo asm` 生成 `target/spl.asm` 和 `target/see.asm`
+  - `cargo asm --see -o sbi.asm` 在当前目录生成 `sbi.asm`
+
   > **NOTICE**
   >
   > - `cargo asm` 视作 `cargo asm --spl --see`
@@ -119,13 +128,19 @@ no payload |                     <<                           |
 
 - **`cargo flash`**
 
-  烧写到 flash，完成后自动从 brom 启动。
+  烧写到 flash。
 
   环境参数的 4 块对于此命令是独立的。
 
+  参数：
+
+  - `--reset` 重置元数据，即格式化 flash
+  - `--boot` 此次烧写完成后从 brom 重启
+
   示例：
 
-  - `cargo flash --spl` 烧写 spl
-  - `cargo flash --see` 烧写 see
+  - `cargo flash --spl --boot` 烧写 spl，完成后立即重启
+  - `cargo flash --see --reset` 烧写 see，并格式化 flash，丢弃以前的 kernel 和 dtb
   - `cargo flash --dt nezha.dts` 烧写设备树
   - `cargo flash --kernel zcore.bin` 烧写内核
+  - `cargo flash --boot` 立即从 brom 重启

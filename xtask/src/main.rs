@@ -35,7 +35,7 @@ enum Commands {
     Make,
     Asm(AsmArg),
     Debug,
-    Flash,
+    Flash(FlashArgs),
 }
 
 static DIRS: Lazy<Dirs> = Lazy::new(Dirs::new);
@@ -52,7 +52,7 @@ fn main() -> Result<(), XError> {
         Make => cli.components.make().map(|_| ()),
         Asm(arg) => cli.components.asm(arg),
         Debug => cli.components.debug(),
-        Flash => cli.components.flash(),
+        Flash(args) => cli.components.flash(args),
     }
 }
 
@@ -139,6 +139,16 @@ struct Target {
 struct AsmArg {
     #[clap(short, long)]
     output: Option<PathBuf>,
+}
+
+#[derive(Args)]
+struct FlashArgs {
+    /// reset meta, in other word, format the rofs
+    #[clap(long)]
+    reset: bool,
+    /// reboot immediately after writing
+    #[clap(long)]
+    boot: bool,
 }
 
 #[derive(Debug)]
