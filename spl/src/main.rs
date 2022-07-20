@@ -12,6 +12,7 @@ use common::{
     AsBinary, EgonHead,
 };
 use core::{arch::asm, panic::PanicInfo};
+use logging::*;
 
 #[naked]
 #[no_mangle]
@@ -144,13 +145,16 @@ extern "C" fn main() -> usize {
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
     let _ = Out << LOGO << Endl;
     // 如果不是从 flash 引导的，直接按照 dram 放好的位置跳
-    if !unsafe { META.from_flash } {
-        let see = unsafe { META.see };
-        if see == !0 {
+    let meta = unsafe { (&META as *const MemMeta).read_volatile() };
+    if !meta.from_flash {
+        let _ = Out << "boot from fel" << Endl;
+        if meta.see == !0 {
             arrow_walk()
         } else {
-            return DRAM + see as usize;
+            return DRAM + meta.see as usize;
         }
+    } else {
+        let _ = Out << "boot from brom" << Endl;
     }
     // 初始化 spi
     let p = Peripherals::take().unwrap();
@@ -185,24 +189,28 @@ extern "C" fn main() -> usize {
         Some(pair) => pair,
         None => arrow_walk(),
     };
+
     // 拷贝 dtb
-    if let Some((base, len)) = meta.dtb() {
-        flash.copy_into(base, unsafe { static_buf(DRAM, len) });
+    if let Some((pos, len)) = meta.dtb() {
+        let _ = log_loading("dtb", pos, len);
+        flash.copy_into(pos, unsafe { static_buf(DRAM, len) });
         let offset = dtb_offset(parse_memory_size(DRAM as _));
         unsafe { META.dtb = offset };
         let dst = (DRAM as u32 + offset) as *mut u8;
         unsafe { dst.copy_from_nonoverlapping(DRAM as *const u8, len) };
     }
     // 拷贝 see
+    let _ = log_loading("see", see_pos, see_len);
     flash.copy_into(see_pos, unsafe { static_buf(DRAM, see_len) });
-    unsafe { META.dtb = 0 };
+    unsafe { META.see = 0 };
     // 拷贝 kernel
-    if let Some((base, len)) = meta.kernel() {
-        flash.copy_into(base, unsafe { static_buf(KERNEL, len) });
-        unsafe { META.dtb = (KERNEL - DRAM) as _ };
+    if let Some((pos, len)) = meta.kernel() {
+        let _ = log_loading("kernel", pos, len);
+        flash.copy_into(pos, unsafe { static_buf(KERNEL, len) });
+        unsafe { META.kernel = (KERNEL - DRAM) as _ };
     }
     // 跳转
-    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(DRAM) << Endl;
+    let _ = Out << "everyting is ready, jump to main stage at " << Hex::Fmt(DRAM) << Endl << Endl;
     DRAM
 }
 
@@ -224,9 +232,11 @@ unsafe fn static_buf(base: usize, size: usize) -> &'static mut [u8] {
     core::slice::from_raw_parts_mut(base as *mut u8, size)
 }
 
-fn arrow_walk() -> ! {
-    use logging::Out;
+fn log_loading(name: &str, pos: u32, len: usize) -> Out {
+    Out << "load " << len << " bytes from " << Hex::Fmt(pos as _) << " for " << name << Endl
+}
 
+fn arrow_walk() -> ! {
     let _ = Out << "no payload ";
     let mut arrow = common::Arrow::init(52, |arr| {
         let _ = Out << unsafe { core::str::from_utf8_unchecked(arr) };

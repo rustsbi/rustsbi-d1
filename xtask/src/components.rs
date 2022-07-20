@@ -191,7 +191,7 @@ impl Components {
     }
 
     pub fn flash(&self) -> Result<(), XError> {
-        use common::{flash::*, AsBinary};
+        use common::{flash::*, memory, AsBinary};
 
         let target = self.make()?;
 
@@ -200,6 +200,8 @@ impl Components {
             // 必须对齐到 16 KiB，实际只有 16 KiB 和 32 KiB 两种可能性，干脆直接 32 KiB
             let mut file = [0u8; EgonHead::DEFAULT.length as _];
             File::open(&spl).unwrap().read(&mut file)?;
+            // 设定 flash 启动
+            unsafe { &mut *(file[0x68..].as_mut_ptr() as *mut memory::Meta) }.from_flash = true;
             // 计算并填写校验和
             let checksum =
                 unsafe { core::slice::from_raw_parts(file.as_ptr() as *const u32, file.len() / 4) }

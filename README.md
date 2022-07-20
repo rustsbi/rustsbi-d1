@@ -74,8 +74,6 @@ no payload |                     <<                           |
 
 3. brom -> spl -> see -> kernel
 
-   > 尚未实现
-
 每种模式都支持在没有后续环节时停住。
 
 ## 命令
@@ -121,6 +119,13 @@ no payload |                     <<                           |
 
 - **`cargo flash`**
 
-  烧写到 flash。
+  烧写到 flash，完成后自动从 brom 启动。
 
-  > **NOTICE** 未实现。预计各个参数将是独立的以支持部分烧写，加快烧写速度。
+  环境参数的 4 块对于此命令是独立的。
+
+  示例：
+
+  - `cargo flash --spl` 烧写 spl
+  - `cargo flash --see` 烧写 see
+  - `cargo flash --dt nezha.dts` 烧写设备树
+  - `cargo flash --kernel zcore.bin` 烧写内核
