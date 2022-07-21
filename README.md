@@ -1,5 +1,8 @@
 ﻿# 哪吒引导工具
 
+[![CI](https://github.com/YdrMaster/nezha-boot-util/actions/workflows/workflow.yml/badge.svg?branch=main)](https://github.com/YdrMaster/nezha-boot-util/actions)
+[![issue](https://img.shields.io/github/issues/YdrMaster/nezha-boot-util)](https://github.com/YdrMaster/nezha-boot-util/issues)
+
 哪吒引导和引导程序调试工具。
 
 ## 模块

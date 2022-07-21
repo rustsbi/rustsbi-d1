@@ -7,7 +7,7 @@
 # More details at https://github.com/rust-lang/rust-clippy
 # and https://rust-lang.github.io/rust-clippy/
 
-name: rust-clippy analyze
+name: CI
 
 on:
   push:
@@ -30,11 +30,26 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
-          components: clippy
+          components: rustfmt, clippy
           override: true
 
-      - name: Install required cargo
-        run: cargo install clippy-sarif sarif-fmt
+      - name: Check format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --check
+
+      - name: Install clippy-sarif
+        uses: actions-rs/install@v0.1
+        with:
+          crate: clippy-sarif
+          version: latest
+
+      - name: Install sarif-fmt
+        uses: actions-rs/install@v0.1
+        with:
+          crate: sarif-fmt
+          version: latest
 
       - name: Run rust-clippy
         run:
