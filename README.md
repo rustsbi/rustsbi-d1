@@ -144,3 +144,7 @@ no payload |                     <<                           |
   - `cargo flash --dt nezha.dts` 烧写设备树
   - `cargo flash --kernel zcore.bin` 烧写内核
   - `cargo flash --boot` 立即从 brom 重启
+
+## 换行问题
+
+如果你使用 minicom 连接开发板，出现显示时光标不回行首的情况（类似[这样](https://github.com/YdrMaster/nezha-boot-util/issues/1)），需要改 minicom 配置，参考[此问答](https://unix.stackexchange.com/questions/283924/how-can-minicom-permanently-translate-incoming-newline-n-to-crlf)。

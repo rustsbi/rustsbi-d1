@@ -88,7 +88,7 @@ impl Shl<Hex> for Out {
                 .map(|bits| ((num >> (bits * 4)) & 0xf) as u8)
                 .skip_while(|x| *x == 0)
                 .fold(self, |out, x| {
-                    out << x + if x < 10 { b'0' } else { b'a' - 10 }
+                    out << (x + if x < 10 { b'0' } else { b'a' - 10 })
                 })
         }
     }

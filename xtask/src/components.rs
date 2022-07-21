@@ -1,5 +1,5 @@
 ﻿use crate::{xfel::Xfel, AsmArg, FlashArgs, Package, Target, XError, DIRS};
-use command_ext::{CommandExt, Ext};
+use command_ext::{dir, CommandExt, Ext};
 use common::uninit;
 use std::{
     ffi::OsStr,
@@ -68,6 +68,7 @@ impl Components {
                     .target
                     .join(dt.file_stem().unwrap_or_else(|| OsStr::new("nezha")))
                     .with_extension("dtb");
+                dir::create_parent(&dtb).unwrap();
                 Ext::new("dtc").arg("-o").arg(&dtb).arg(&dt).invoke();
                 ans.dtb.replace(dtb);
             } else {
@@ -98,6 +99,7 @@ impl Components {
             let path = if output.is_dir() {
                 output.join(package.name()).with_extension("asm")
             } else {
+                dir::create_parent(&output).unwrap();
                 output
             };
             // 保存
@@ -199,7 +201,7 @@ impl Components {
             use common::EgonHead;
             // 必须对齐到 16 KiB，实际只有 16 KiB 和 32 KiB 两种可能性，干脆直接 32 KiB
             let mut file = [0u8; EgonHead::DEFAULT.length as _];
-            File::open(&spl).unwrap().read(&mut file)?;
+            let _ = File::open(&spl).unwrap().read(&mut file)?;
             // 设定 flash 启动
             unsafe { &mut *(file[0x68..].as_mut_ptr() as *mut memory::Meta) }.from_flash = true;
             // 计算并填写校验和

@@ -62,6 +62,7 @@ impl<const P: char, const N: u8, MODE> Pin<P, N, MODE> {
     }
 }
 
+#[allow(clippy::transmutes_expressible_as_ptr_casts)]
 impl<const P: char, const N: u8, MODE> Pin<P, N, MODE> {
     #[inline(always)]
     const fn new() -> Self {
