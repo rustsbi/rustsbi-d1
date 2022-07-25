@@ -9,3 +9,6 @@ edition = "2021"
 embedded-hal = "1.0.0-alpha.8"
 d1-pac = "0.0.24"
 nb = "1"
+
+[features]
+m-mode = []

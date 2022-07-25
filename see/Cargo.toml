@@ -11,10 +11,8 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustsbi = { git = "https://github.com/rustsbi/rustsbi", rev = "af60b02", features = [
-    "legacy",
-] }
+rustsbi = { version = "0.3.0-alpha.2", features = ["legacy"] }
 riscv = "0.8"
 r0 = "1"
-hal = { path = "../hal" }
+hal = { path = "../hal", features = ["m-mode"] }
 common = { path = "../common" }

@@ -1,9 +1,8 @@
 use crate::Supervisor;
-use riscv::register::{mstatus, mtval, scause, sepc, stval, stvec};
+use riscv::register::*;
 
 pub(crate) fn execute_supervisor(supervisor: Supervisor) {
     use core::arch::asm;
-    use riscv::register::{medeleg, mie};
 
     unsafe {
         mstatus::set_mpp(mstatus::MPP::Supervisor);
@@ -25,10 +24,7 @@ pub(crate) fn execute_supervisor(supervisor: Supervisor) {
     }
 
     loop {
-        use riscv::register::{
-            mcause::{self, Exception as E, Interrupt as I, Trap as T},
-            mip,
-        };
+        use mcause::{Exception as E, Interrupt as I, Trap as T};
 
         unsafe { m_to_s(&mut ctx) };
 
@@ -162,12 +158,9 @@ impl Context {
         if ins & !RD_MASK == 0xC0102073 {
             // rdtime is actually a csrrw instruction
 
-            let mtime: u64;
-            unsafe { core::arch::asm!("csrr {}, time", out(reg) mtime) };
-
             let rd = (ins & RD_MASK) >> RD_MASK.trailing_zeros();
             if rd != 0 {
-                *self.x_mut(rd) = mtime as _;
+                *self.x_mut(rd) = time::read();
             }
 
             self.mepc = self.mepc.wrapping_add(4); // skip current instruction
@@ -177,7 +170,7 @@ impl Context {
         }
     }
 
-    fn trap_stop(&self, trap: riscv::register::mcause::Trap) -> ! {
+    fn trap_stop(&self, trap: mcause::Trap) -> ! {
         println!(
             "
 -----------------------------

@@ -1,37 +1,62 @@
-pub const UART0_BASE: usize = 0x0250_0000;
-pub const UART_THR: usize = 0;
-pub const UART_RBR: usize = 0;
-pub const UART_LSR: usize = 0x14;
-pub const UART_USR: usize = 0x7c;
-
-pub const CLINT_BASE: usize = 0x0400_0000;
-pub const MSIP0: usize = 0;
-pub const MTIMECMPL: usize = 0x4000;
-
+#[cfg(feature = "m-mode")]
 pub mod mtimecmp {
-    use super::{write_reg, CLINT_BASE, MTIMECMPL};
-    pub fn write(word: u64) {
-        unsafe {
-            let mask = u64::MAX;
-            write_reg(CLINT_BASE, MTIMECMPL, (word & mask) as u32);
-            write_reg(CLINT_BASE, MTIMECMPL + 4, (word >> 32) as u32);
-        }
+    use super::clint;
+
+    #[inline]
+    pub fn write(mtime_val: u64) {
+        clint()
+            .mtimecmph
+            .write(|w| unsafe { w.bits((mtime_val >> u32::BITS) as _) });
+        clint()
+            .mtimecmpl
+            .write(|w| unsafe { w.bits(mtime_val as _) });
     }
 }
+
+pub mod stimecmp {
+    use super::clint;
+
+    #[inline]
+    pub fn write(stime_val: u64) {
+        clint()
+            .stimecmph
+            .write(|w| unsafe { w.bits((stime_val >> u32::BITS) as _) });
+        clint()
+            .stimecmpl
+            .write(|w| unsafe { w.bits(stime_val as _) });
+    }
+}
+
+#[cfg(feature = "m-mode")]
 pub mod msip {
-    use super::{write_reg, CLINT_BASE, MSIP0};
+    use super::clint;
 
-    pub fn set_ipi(_word: usize) {
-        unsafe { write_reg(CLINT_BASE, MSIP0, 1u64) }
+    #[inline]
+    pub fn set() {
+        clint().msip.write(|w| unsafe { w.bits(1) });
     }
-    pub fn clear_ipi(_word: usize) {
-        unsafe { write_reg(CLINT_BASE, MSIP0, 0) }
+
+    #[inline]
+    pub fn clear() {
+        clint().msip.reset();
     }
 }
 
-use core::ptr::write_volatile;
+pub mod ssip {
+    use super::clint;
 
-#[inline]
-unsafe fn write_reg<T>(addr: usize, offset: usize, val: T) {
-    write_volatile((addr + offset) as *mut T, val);
+    #[inline]
+    pub fn set() {
+        clint().ssip.write(|w| unsafe { w.bits(1) });
+    }
+
+    #[inline]
+    pub fn clear() {
+        clint().ssip.reset();
+    }
+}
+
+#[inline(always)]
+const fn clint() -> &'static d1_pac::clint::RegisterBlock {
+    unsafe { &*d1_pac::CLINT::PTR }
 }

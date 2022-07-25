@@ -106,9 +106,7 @@ extern "C" fn rust_main() {
         set_pmp(mem, kernel);
         hart_csr_utils::print_pmps();
 
-        let plic = unsafe { &*hal::pac::PLIC::ptr() };
-        use hal::pac::plic::ctrl::CTRL_A;
-        plic.ctrl.write(|w| w.ctrl().variant(CTRL_A::MS));
+        hal::plic::allow_supervisor();
 
         let dtb = board_info.as_ref().map_or(0, |i| i.dtb.start);
         println!("execute_supervisor at {kernel:#x} with a1 = {dtb:#x}");
