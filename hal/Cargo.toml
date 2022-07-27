@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 embedded-hal = "1.0.0-alpha.8"
-d1-pac = "0.0.24"
+d1-pac = "0.0.25"
 nb = "1"
 
 [features]

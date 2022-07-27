@@ -1,9 +1,9 @@
-﻿# 哪吒引导工具
+﻿# RustSBI implementation for Allwinner D1
 
-[![CI](https://github.com/YdrMaster/nezha-boot-util/actions/workflows/workflow.yml/badge.svg?branch=main)](https://github.com/YdrMaster/nezha-boot-util/actions)
-[![issue](https://img.shields.io/github/issues/YdrMaster/nezha-boot-util)](https://github.com/YdrMaster/nezha-boot-util/issues)
+[![CI](https://github.com/rustsbi/rustsbi-d1/actions/workflows/workflow.yml/badge.svg?branch=main)](https://github.com/rustsbi/rustsbi-d1/actions)
+[![issue](https://img.shields.io/github/issues/rustsbi/rustsbi-d1)](https://github.com/rustsbi/rustsbi-d1/issues)
 
-哪吒引导和引导程序调试工具。
+全志 D1 引导程序及其调试工具。
 
 ## 模块
 
@@ -181,4 +181,4 @@ no payload |                     <<                           |
 
 ## 换行问题
 
-如果你使用 minicom 连接开发板，出现显示时光标不回行首的情况（类似[这样](https://github.com/YdrMaster/nezha-boot-util/issues/1)），需要改 minicom 配置，参考[此问答](https://unix.stackexchange.com/questions/283924/how-can-minicom-permanently-translate-incoming-newline-n-to-crlf)。
+如果你使用 minicom 连接开发板，出现显示时光标不回行首的情况（类似[这样](https://github.com/rustsbi/rustsbi-d1/issues/1)），需要改 minicom 配置，参考[此问答](https://unix.stackexchange.com/questions/283924/how-can-minicom-permanently-translate-incoming-newline-n-to-crlf)。

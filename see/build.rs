@@ -2,12 +2,12 @@ fn main() {
     use std::{env, fs, path::PathBuf};
 
     let ld = &PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("see.ld");
-    fs::write(ld, NEZHA_FLASH).unwrap();
+    fs::write(ld, LINKER).unwrap();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rustc-link-arg=-T{}", ld.display());
 }
 
-const NEZHA_FLASH: &[u8] = b"
+const LINKER: &[u8] = b"
 OUTPUT_ARCH(riscv)
 ENTRY(entry)
 MEMORY {
