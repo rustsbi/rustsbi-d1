@@ -1,5 +1,5 @@
 [workspace]
-members = ["common", "hal", "spl", "see", "xtask"]
+members = ["common", "hal", "spl", "see", "test-kernel", "xtask"]
 default-members = ["xtask"]
 
 [profile.release]

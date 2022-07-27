@@ -75,6 +75,7 @@ impl Dirs {
 enum Package {
     Spl,
     See,
+    TestKernel,
 }
 
 impl Package {
@@ -83,6 +84,7 @@ impl Package {
         match self {
             Self::Spl => "spl",
             Self::See => "see",
+            Self::TestKernel => "test-kernel",
         }
     }
 

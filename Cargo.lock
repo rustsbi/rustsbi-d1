@@ -224,6 +224,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
+name = "lock_api"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "327fa5b6a6940e4699ec49a9beae1ea4845c6bab9314e4f84ac68742139d8c53"
+dependencies = [
+ "autocfg",
+ "scopeguard",
+]
+
+[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -348,7 +358,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5697645411c21e33776cddebf26f19f98a2405ff82e88d11b2bc35dc8a8b6d59"
 dependencies = [
  "riscv",
- "sbi-spec",
+ "sbi-spec 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "sbi-rt"
+version = "0.0.1"
+source = "git+https://github.com/rustsbi/sbi-rt.git?branch=dev#bbabc67b7a613ce1f75cde8610b31335457f15a4"
+dependencies = [
+ "sbi-spec 0.0.2 (git+https://github.com/rustsbi/sbi-spec.git?branch=dev)",
 ]
 
 [[package]]
@@ -356,6 +374,29 @@ name = "sbi-spec"
 version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b617d3b07d7bcdeb0590d4fea9460b004fbc5ecfc975993b9cbcc3a2f67fcce"
+
+[[package]]
+name = "sbi-spec"
+version = "0.0.2"
+source = "git+https://github.com/rustsbi/sbi-spec.git?branch=dev#54a6bad86582b275f0ef0d49c771067cb7518bdd"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
+name = "sbi-testing"
+version = "0.0.1"
+source = "git+https://github.com/rustsbi/sbi-testing?rev=b64abbe#b64abbe87d165c8aedec993cfc450505c1d6a8d9"
+dependencies = [
+ "riscv",
+ "sbi-rt",
+]
+
+[[package]]
+name = "scopeguard"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "see"
@@ -369,6 +410,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "spl"
 version = "0.1.0"
 dependencies = [
@@ -376,6 +426,12 @@ dependencies = [
  "hal",
  "r0",
 ]
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "strsim"
@@ -401,6 +457,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test-kernel"
+version = "0.1.0"
+dependencies = [
+ "hal",
+ "r0",
+ "riscv",
+ "sbi-testing",
+ "spin",
 ]
 
 [[package]]

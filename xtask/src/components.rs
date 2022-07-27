@@ -43,16 +43,21 @@ impl Components {
         if self.see {
             ans.see.replace(Package::See.objcopy());
         }
-        // 检查 kernel 文件是否存在
+        // 生成 kernel
         if let Some(kernel) = &self.kernel {
-            if !kernel.is_file() {
-                return Err(IoError::new(
-                    IoErrorKind::NotFound,
-                    format!("kernel file \"{}\" not exist", kernel.display()),
-                )
-                .into());
+            if kernel.as_os_str() == OsStr::new("::test") {
+                ans.kernel.replace(Package::TestKernel.objcopy());
+            } else {
+                // 检查 kernel 文件是否存在
+                if !kernel.is_file() {
+                    return Err(IoError::new(
+                        IoErrorKind::NotFound,
+                        format!("kernel file \"{}\" not exist", kernel.display()),
+                    )
+                    .into());
+                }
+                ans.kernel.replace(kernel.clone());
             }
-            ans.kernel.replace(kernel.clone());
         }
         // 生成 dtb
         if let Some(dt) = &self.dt {
