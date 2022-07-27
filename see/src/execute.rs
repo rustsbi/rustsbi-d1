@@ -21,21 +21,22 @@ pub(crate) fn execute_supervisor(supervisor: Supervisor) {
         crate::set_mtvec(s_to_m as usize);
         mie::set_mext();
         mie::set_msoft();
+        mie::set_mtimer();
     }
 
     loop {
+        use hal::clint::{msip, mtimecmp};
         use mcause::{Exception as E, Interrupt as I, Trap as T};
 
         unsafe { m_to_s(&mut ctx) };
 
         match mcause::read().cause() {
             T::Interrupt(I::MachineTimer) => unsafe {
-                mie::clear_mtimer();
-                mip::clear_mtimer();
+                mtimecmp::write(u64::MAX);
                 mip::set_stimer();
             },
             T::Interrupt(I::MachineSoft) => unsafe {
-                mip::clear_msoft();
+                msip::clear();
                 mip::set_ssoft();
             },
             T::Exception(E::SupervisorEnvCall) => {

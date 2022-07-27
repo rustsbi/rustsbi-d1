@@ -153,6 +153,7 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
         }
     });
 
+    println!("[test-kernel] SBI test PASSED");
     sbi::system_reset(sbi::RESET_TYPE_SHUTDOWN, sbi::RESET_REASON_NO_REASON);
     unreachable!()
 }

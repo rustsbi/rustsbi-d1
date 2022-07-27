@@ -65,6 +65,37 @@ no payload |                     <<                           |
 [rustsbi] no kernel |                                      <<         |
 ```
 
+### TEST-KERNEL
+
+用于测试 SEE 的 Supervisor，若 SEE 工作正常，产生如下输出：
+
+```text
+ _____         _     _  __                    _
+|_   _|__  ___| |_  | |/ /___ _ __ _ __   ___| |
+  | |/ _ \/ __| __| | ' // _ \ '__| '_ \ / _ \ |
+  | |  __/\__ \ |_  | . \  __/ |  | | | |  __/ |
+  |_|\___||___/\__| |_|\_\___|_|  |_| |_|\___|_|
+================================================
+| boot hart id          |                    0 |
+| dtb physical address  |           0x7fe00000 |
+------------------------------------------------
+[test-kernel] Testing Base
+[test-kernel] sbi spec version = 1.0
+[test-kernel] sbi impl = RustSBI
+[test-kernel] sbi impl version = 0x300
+[test-kernel] sbi extensions = [Base, TIME, sPI, SRST]
+[test-kernel] mvendor id = 0x5b7
+[test-kernel] march id = 0x5b7
+[test-kernel] mimp id = 0x5b7
+[test-kernel] Testing TIME
+[test-kernel] read time register successfuly, set timer +1s
+[test-kernel] timer interrupt delegate successfuly
+[test-kernel] Testing sPI
+[test-kernel] send ipi successfuly
+[test-kernel] SBI test PASSED
+[rustsbi] system reset |                   >> |
+```
+
 ## 加载过程
 
 支持以下模式：
@@ -83,10 +114,10 @@ no payload |                     <<                           |
 
 环境参数：
 
-- `--spl`
-- `--see`
-- `--kernel <file>`
-- `--dt <file>`
+- **`--spl`**：命令指定的操作将加载 spl。
+- **`--see`**：命令指定的操作将加载 see。
+- **`--kernel <file/::test>`**：命令指定的操作将加载指定内核文件或测试内核。
+- **`--dt <file>`**：命令指定的操作将加载指定设备树文件。
 
 命令：
 
