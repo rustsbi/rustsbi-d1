@@ -48,17 +48,6 @@ impl Meta {
         dtb: MetaEntry::DEFAULT,
     };
 
-    /// 构造一个未初始化的 flash 元数据。
-    ///
-    /// # Safety
-    ///
-    /// 生成的对象具有随机初始值。
-    #[inline]
-    pub const unsafe fn uninit() -> Self {
-        #[allow(clippy::uninit_assumed_init)]
-        core::mem::MaybeUninit::uninit().assume_init()
-    }
-
     read_payload!(see);
     read_payload!(kernel);
     read_payload!(dtb);

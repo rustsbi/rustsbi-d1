@@ -182,7 +182,7 @@ extern "C" fn main() -> usize {
     }
     let _ = Out << Endl;
     // 读取 meta
-    let mut meta = unsafe { FlashMeta::uninit() };
+    let mut meta = FlashMeta::DEFAULT;
     flash.copy_into(META_POS, meta.as_buf());
     // 如果 see 不存在，停在此阶段
     let (see_pos, see_len) = match meta.see() {
