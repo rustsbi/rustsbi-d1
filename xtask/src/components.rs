@@ -1,6 +1,6 @@
-﻿use crate::{xfel::Xfel, AsmArg, FlashArgs, Package, Target, XError, DIRS};
-use command_ext::{dir, CommandExt, Ext};
+use crate::{xfel::Xfel, AsmArg, FlashArgs, Package, Target, XError, DIRS};
 use common::uninit;
+use os_xtask_utils::{dir, CommandExt, Ext};
 use std::{
     ffi::OsStr,
     fs::{self, File},

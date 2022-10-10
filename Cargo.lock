@@ -102,14 +102,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "command-ext"
-version = "0.1.0"
-source = "git+https://github.com/YdrMaster/command-ext.git?rev=f25befb#f25befb0b5a58e3e75fb3a891d6cc5969a13d93c"
-dependencies = [
- "lazy_static",
-]
-
-[[package]]
 name = "common"
 version = "0.1.0"
 dependencies = [
@@ -123,7 +115,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a14cc3643d9ad61e2c117a20f0b9371e0afd61a91e416f9a217c0cb0152e192f"
 dependencies = [
  "bare-metal",
- "riscv",
+ "riscv 0.8.0",
  "vcell",
 ]
 
@@ -212,12 +204,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
 name = "libc"
 version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,9 +251,18 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
 name = "once_cell"
-version = "1.13.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
+checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+
+[[package]]
+name = "os-xtask-utils"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5e9cccd7bf690840399e09e283b7f5aa219886dc5770c083beee2adca0ffabe"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "os_str_bytes"
@@ -352,33 +347,49 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustsbi"
-version = "0.3.0-alpha.2"
+name = "riscv"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5697645411c21e33776cddebf26f19f98a2405ff82e88d11b2bc35dc8a8b6d59"
+checksum = "73fc4bc7113424814738fe79755a5764e392b3d4d1bc757e6aa6f61cede32095"
 dependencies = [
- "riscv",
- "sbi-spec 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bare-metal",
+ "bit_field",
+ "embedded-hal 0.2.7",
+]
+
+[[package]]
+name = "rustsbi"
+version = "0.3.0-alpha.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ffd816cc6c1abe4662ddef08d3dc9b6fe02cdba388bb461d2418f5c183615f3"
+dependencies = [
+ "riscv 0.9.0",
+ "sbi-spec 0.0.3",
 ]
 
 [[package]]
 name = "sbi-rt"
-version = "0.0.1"
-source = "git+https://github.com/rustsbi/sbi-rt.git?branch=dev#bbabc67b7a613ce1f75cde8610b31335457f15a4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c113c53291db8ac141e01f43224ed488b8d6001ab66737b82e04695a43a42b7"
 dependencies = [
- "sbi-spec 0.0.2 (git+https://github.com/rustsbi/sbi-spec.git?branch=dev)",
+ "sbi-spec 0.0.4",
 ]
 
 [[package]]
 name = "sbi-spec"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b617d3b07d7bcdeb0590d4fea9460b004fbc5ecfc975993b9cbcc3a2f67fcce"
+checksum = "ab331a5c9852a6587ea9fc74bdda950d7dfc7076aa791434d45cbc2001ba5c7c"
+dependencies = [
+ "static_assertions",
+]
 
 [[package]]
 name = "sbi-spec"
-version = "0.0.2"
-source = "git+https://github.com/rustsbi/sbi-spec.git?branch=dev#54a6bad86582b275f0ef0d49c771067cb7518bdd"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d4027cf9bb591a9fd0fc0e283be6165c5abe96cb73e9f0e24738c227f425377"
 dependencies = [
  "static_assertions",
 ]
@@ -386,10 +397,13 @@ dependencies = [
 [[package]]
 name = "sbi-testing"
 version = "0.0.1"
-source = "git+https://github.com/rustsbi/sbi-testing?rev=b64abbe#b64abbe87d165c8aedec993cfc450505c1d6a8d9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b5723dcf4011f2d181c2547227344900bd68027b1fa9bc42dfe3bd8f1d57443"
 dependencies = [
- "riscv",
+ "log",
+ "riscv 0.9.0",
  "sbi-rt",
+ "sbi-spec 0.0.4",
 ]
 
 [[package]]
@@ -405,7 +419,7 @@ dependencies = [
  "common",
  "hal",
  "r0",
- "riscv",
+ "riscv 0.9.0",
  "rustsbi",
 ]
 
@@ -464,8 +478,9 @@ name = "test-kernel"
 version = "0.1.0"
 dependencies = [
  "hal",
+ "log",
  "r0",
- "riscv",
+ "riscv 0.9.0",
  "sbi-testing",
  "spin",
 ]
@@ -537,9 +552,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "clap-verbosity-flag",
- "command-ext",
  "common",
  "env_logger",
  "log",
  "once_cell",
+ "os-xtask-utils",
 ]

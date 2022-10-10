@@ -9,9 +9,9 @@ extern crate log;
 
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
-use command_ext::{BinUtil, Cargo, CommandExt};
 use components::Components;
 use once_cell::sync::Lazy;
+use os_xtask_utils::{BinUtil, Cargo, CommandExt};
 use std::{
     error::Error,
     fmt::{Debug, Display},

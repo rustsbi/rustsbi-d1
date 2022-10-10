@@ -1,5 +1,5 @@
-﻿use command_ext::{ext, CommandExt, Ext};
 use once_cell::sync::Lazy;
+use os_xtask_utils::{ext, CommandExt, Ext};
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},

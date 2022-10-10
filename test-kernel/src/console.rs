@@ -1,5 +1,11 @@
 use core::fmt::{Arguments, Result, Write};
 use hal::pac::UART0;
+use log::{Level, LevelFilter, Log};
+
+pub(crate) fn init() {
+    log::set_logger(&Console).unwrap();
+    log::set_max_level(LevelFilter::Trace);
+}
 
 struct Console;
 
@@ -36,4 +42,30 @@ macro_rules! println {
         $crate::console::print(core::format_args!($($arg)*));
         $crate::print!("\n");
     }}
+}
+
+impl Log for Console {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            let color_code = match record.level() {
+                Level::Error => "31",
+                Level::Warn => "93",
+                Level::Info => "34",
+                Level::Debug => "32",
+                Level::Trace => "90",
+            };
+            println!(
+                "\x1b[{}m[{:>5}] {}\x1b[0m",
+                color_code,
+                record.level(),
+                record.args()
+            );
+        }
+    }
+
+    fn flush(&self) {}
 }
