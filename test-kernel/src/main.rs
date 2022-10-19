@@ -2,7 +2,7 @@
 
 #![no_std]
 #![no_main]
-#![feature(naked_functions, asm_sym, asm_const)]
+#![feature(naked_functions, asm_const)]
 
 use core::arch::asm;
 use sbi_testing::sbi;
