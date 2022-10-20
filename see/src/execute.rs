@@ -27,6 +27,7 @@ pub(crate) fn execute_supervisor(supervisor: Supervisor) {
     loop {
         use hal::clint::{msip, mtimecmp};
         use mcause::{Exception as E, Interrupt as I, Trap as T};
+        use scause::{Exception, Trap};
 
         unsafe { m_to_s(&mut ctx) };
 
@@ -47,7 +48,7 @@ pub(crate) fn execute_supervisor(supervisor: Supervisor) {
             T::Exception(E::IllegalInstruction) => {
                 let ins = mtval::read();
                 if !ctx.emulate_rdtime(ins) {
-                    ctx.trap_stop(T::Exception(E::IllegalInstruction));
+                    ctx.do_transfer_trap(Trap::Exception(Exception::IllegalInstruction));
                 }
             }
             trap => ctx.trap_stop(trap),
