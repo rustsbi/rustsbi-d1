@@ -9,9 +9,8 @@ mod hart_csr_utils;
 #[macro_use] // for print
 extern crate rustsbi;
 
-use core::{arch::asm, ops::Range, panic::PanicInfo};
-
 use common::memory;
+use core::{arch::asm, ops::Range, panic::PanicInfo};
 
 /// 特权软件信息。
 struct Supervisor {
@@ -31,25 +30,19 @@ struct Supervisor {
 #[naked]
 #[no_mangle]
 #[link_section = ".text.entry"]
-unsafe extern "C" fn entry() -> ! {
+unsafe extern "C" fn _start() -> ! {
     const STACK_SIZE: usize = 4096;
     #[link_section = ".bss.uninit"]
     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
     asm!(
-        "
-            csrw mie,  zero
-            la    sp, {stack}
-            li    t0, {stack_size}
-            add   sp,  sp, t0
-            call {rust_main}
-        1:  wfi
-            j     1b
+        "   la sp, {stack} + {stack_size}
+            j  {rust_main}
         ",
-        stack      =   sym STACK,
         stack_size = const STACK_SIZE,
+        stack      =   sym STACK,
         rust_main  =   sym rust_main,
-        options(noreturn)
+        options(noreturn),
     )
 }
 
@@ -95,7 +88,7 @@ extern "C" fn rust_main() {
         ver_sbi = rustsbi::VERSION,
         logo = rustsbi::LOGO,
         ver_impl = env!("CARGO_PKG_VERSION"),
-        firmware = entry as usize,
+        firmware = _start as usize,
     );
 
     if kernel == 0 {

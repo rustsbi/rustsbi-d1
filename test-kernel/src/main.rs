@@ -39,8 +39,8 @@ unsafe extern "C" fn _start(hartid: usize, device_tree_paddr: usize) -> ! {
         "   la sp, {stack} + {stack_size}
             j  {rust_main}
         ",
-        stack      =   sym STACK,
         stack_size = const STACK_SIZE,
+        stack      =   sym STACK,
         rust_main  =   sym rust_main,
         options(noreturn),
     )

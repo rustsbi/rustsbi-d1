@@ -9,7 +9,7 @@ fn main() {
 
 const LINKER: &[u8] = b"
 OUTPUT_ARCH(riscv)
-ENTRY(entry)
+ENTRY(_start)
 MEMORY {
     DDR : ORIGIN = 0x40000000, LENGTH = 2M
 }
@@ -20,25 +20,22 @@ SECTIONS {
         *(.text.trap_handler)
         *(.text .text.*)
     } > DDR
-    .rodata : ALIGN(8) {
-        srodata = .;
+    .rodata : {
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
-        erodata = .;
     } > DDR
-    .data : ALIGN(8) {
-        sdata = .;
+    .data : {
         *(.data .data.*)
         *(.sdata .sdata.*)
-        edata = .;
     } > DDR
     sidata = LOADADDR(.data);
-    .bss (NOLOAD) : ALIGN(8) {
+    .bss (NOLOAD) : {
         *(.bss.uninit)
         . = ALIGN(8);
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
+        . = ALIGN(8);
         ebss = .;
     } > DDR
     /DISCARD/ : {
