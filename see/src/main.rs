@@ -93,7 +93,7 @@ extern "C" fn rust_main() {
         mem = board_info.as_ref().map_or(0..0, |i| i.mem.clone()),
         dtb = board_info.as_ref().map_or(0..0, |i| i.dtb.clone()),
         ver_sbi = rustsbi::VERSION,
-        logo = rustsbi::logo(),
+        logo = rustsbi::LOGO,
         ver_impl = env!("CARGO_PKG_VERSION"),
         firmware = entry as usize,
     );

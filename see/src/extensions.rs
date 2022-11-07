@@ -55,10 +55,10 @@ impl rustsbi::Reset for Reset {
 }
 
 impl rustsbi::Ipi for Ipi {
-    fn send_ipi_many(&self, hart_mask: HartMask) -> SbiRet {
+    fn send_ipi(&self, hart_mask: HartMask) -> SbiRet {
         if hart_mask.has_bit(0) {
             msip::set();
         }
-        SbiRet::ok(0)
+        SbiRet::success(0)
     }
 }

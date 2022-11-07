@@ -233,9 +233,9 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "os-xtask-utils"
@@ -341,12 +341,12 @@ dependencies = [
 
 [[package]]
 name = "rustsbi"
-version = "0.3.0-alpha.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ffd816cc6c1abe4662ddef08d3dc9b6fe02cdba388bb461d2418f5c183615f3"
+checksum = "9671db0f50ebfd111cdaf17783ff72ffeb637e76eb1a399ff7fc347408505403"
 dependencies = [
  "riscv 0.9.0",
- "sbi-spec 0.0.3",
+ "sbi-spec",
 ]
 
 [[package]]
@@ -355,16 +355,7 @@ version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c113c53291db8ac141e01f43224ed488b8d6001ab66737b82e04695a43a42b7"
 dependencies = [
- "sbi-spec 0.0.4",
-]
-
-[[package]]
-name = "sbi-spec"
-version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab331a5c9852a6587ea9fc74bdda950d7dfc7076aa791434d45cbc2001ba5c7c"
-dependencies = [
- "static_assertions",
+ "sbi-spec",
 ]
 
 [[package]]
@@ -385,7 +376,7 @@ dependencies = [
  "log",
  "riscv 0.9.0",
  "sbi-rt",
- "sbi-spec 0.0.4",
+ "sbi-spec",
 ]
 
 [[package]]

@@ -54,25 +54,16 @@ impl Meta {
 
     #[inline]
     pub fn set_see(&mut self, base: u32, size: u32) {
-        self.see = MetaEntry {
-            offset: base as u32,
-            size: size as u32,
-        };
+        self.see = MetaEntry { offset: base, size };
     }
 
     #[inline]
     pub fn set_kernel(&mut self, base: u32, size: u32) {
-        self.kernel = MetaEntry {
-            offset: base as u32,
-            size: size as u32,
-        };
+        self.kernel = MetaEntry { offset: base, size };
     }
 
     #[inline]
     pub fn set_dtb(&mut self, base: u32, size: u32) {
-        self.dtb = MetaEntry {
-            offset: base as u32,
-            size: size as u32,
-        };
+        self.dtb = MetaEntry { offset: base, size };
     }
 }
