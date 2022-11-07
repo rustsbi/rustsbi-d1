@@ -220,7 +220,7 @@ const LOGO: &str = r"
  /    / -_)_ // _ \/ _ `/ / _  / _ \/ _ \/ __/ / /_/ / __/ / /
 /_/|_/\__//__/_//_/\_,_/ /____/\___/\___/\__/  \____/\__/_/_/🦀";
 
-#[cfg_attr(not(test), panic_handler)]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {
         core::hint::spin_loop();

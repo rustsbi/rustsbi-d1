@@ -97,12 +97,12 @@ pub trait AsBinary: Sized {
 
     #[inline]
     fn as_buf(&mut self) -> &mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, Self::SIZE) }
+        unsafe { core::slice::from_raw_parts_mut(self as *mut _ as _, Self::SIZE) }
     }
 
     #[inline]
     fn as_bytes(&self) -> &[u8] {
-        unsafe { core::slice::from_raw_parts(self as *const _ as *const u8, Self::SIZE) }
+        unsafe { core::slice::from_raw_parts(self as *const _ as _, Self::SIZE) }
     }
 }
 
@@ -115,9 +115,4 @@ pub trait AsBinary: Sized {
 pub const unsafe fn uninit<T: AsBinary>() -> T {
     #[allow(clippy::uninit_assumed_init)]
     core::mem::MaybeUninit::uninit().assume_init()
-}
-
-#[inline]
-pub const fn bytes_of<T: AsBinary>(val: &T) -> &[u8] {
-    unsafe { core::slice::from_raw_parts(val as *const _ as *const u8, T::SIZE) }
 }

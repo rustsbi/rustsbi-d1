@@ -10,7 +10,7 @@ use sbi_testing::sbi;
 #[macro_use]
 mod console;
 
-#[cfg_attr(not(test), panic_handler)]
+#[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     let (hard_id, pc): (usize, usize);
     unsafe { asm!("mv    {}, tp", out(reg) hard_id) };
@@ -36,18 +36,13 @@ unsafe extern "C" fn _start(hartid: usize, device_tree_paddr: usize) -> ! {
     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
     asm!(
-        "   csrw sie,  zero
-            la    sp, {stack}
-            li    t0, {stack_size}
-            add   sp,  sp, t0
-            call {rust_main}
-        1:  wfi
-            j     1b
+        "   la sp, {stack} + {stack_size}
+            j  {rust_main}
         ",
         stack      =   sym STACK,
         stack_size = const STACK_SIZE,
         rust_main  =   sym rust_main,
-        options(noreturn)
+        options(noreturn),
     )
 }
 

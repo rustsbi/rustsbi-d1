@@ -151,7 +151,7 @@ impl<const N: usize> StringInline<N> {
     }
 }
 
-#[cfg_attr(not(test), panic_handler)]
+#[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{info}");
     loop {
