@@ -219,7 +219,8 @@ extern "C" fn fast_handler(
                 mepc::next();
                 ctx.restore()
             } else {
-                todo!("known")
+                println!("IllegalInstruction: {ins:#x} at mepc = {:#x}", mepc::read(),);
+                panic!("stopped with unsupported trap")
             }
         }
         // 其他陷入
