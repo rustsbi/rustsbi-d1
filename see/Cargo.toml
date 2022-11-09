@@ -11,9 +11,10 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustsbi = { version = "0.3.0", features = ["legacy"] }
-aclint = "0.0.0"
-riscv = "0.9.0"
+rustsbi = "0.3.0"
+riscv = "0.9"
 r0 = "1"
-hal = { path = "../hal", features = ["m-mode"] }
+aclint = "0.0.0"
+rcore-console = "0.0.0"
+hal = { path = "../hal" }
 common = { path = "../common" }

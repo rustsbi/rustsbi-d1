@@ -95,7 +95,7 @@ impl Context {
         use rustsbi::spec::{binary::*, hsm::*, srst::*};
         let extension = self.a(7);
         let function = self.a(6);
-        let ans = rustsbi::ecall(
+        let ans = crate::extensions::sbi().handle_ecall(
             extension,
             function,
             [

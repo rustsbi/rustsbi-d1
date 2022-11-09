@@ -5,11 +5,12 @@
 #![feature(naked_functions, asm_const)]
 
 use core::arch::asm;
+use hal::pac::UART0;
 use riscv::register::*;
 use sbi_testing::sbi;
 
 #[macro_use]
-mod console;
+extern crate rcore_console;
 
 /// 内核入口。
 ///
@@ -42,7 +43,8 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
         static mut ebss: u64;
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
-    console::init();
+    rcore_console::init_console(&Console);
+    rcore_console::set_log_level(option_env!("LOG"));
 
     let smp = 1;
     let frequency = 24_000_000;
@@ -130,4 +132,18 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("[test-kernel-panic] SBI test FAILED due to panic");
     sbi::system_reset(sbi::Shutdown, sbi::SystemFailure);
     loop {}
+}
+
+struct Console;
+
+impl rcore_console::Console for Console {
+    #[inline]
+    fn put_char(&self, c: u8) {
+        let uart = unsafe { &*UART0::ptr() };
+        // 等待 FIFO 空位
+        while uart.usr.read().tfnf().is_full() {
+            core::hint::spin_loop();
+        }
+        uart.thr().write(|w| w.thr().variant(c));
+    }
 }

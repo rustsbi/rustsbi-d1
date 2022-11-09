@@ -1,36 +1,33 @@
 use aclint::SifiveClint as Clint;
-use hal::{pac::UART0, CLINT_BASE};
+use core::{convert::Infallible, mem::MaybeUninit};
+use hal::CLINT_BASE;
 use riscv::register::mip;
-use rustsbi::{spec::binary::SbiRet, HartMask};
+use rustsbi::{spec::binary::SbiRet, HartMask, RustSBI};
 
-struct LegacyConsole;
-struct Timer;
-struct Reset;
-struct Ipi;
+static mut SBI: MaybeUninit<FixedRustSBI> = MaybeUninit::uninit();
 
-pub fn init() {
-    rustsbi::legacy_stdio::init_legacy_stdio(&LegacyConsole);
-    rustsbi::init_timer(&Timer);
-    rustsbi::init_reset(&Reset);
-    rustsbi::init_ipi(&Ipi);
-}
+pub(crate) struct Impl;
+pub(crate) type FixedRustSBI<'a> =
+    RustSBI<&'a Impl, &'a Impl, Infallible, Infallible, &'a Impl, Infallible>;
 
-impl rustsbi::legacy_stdio::LegacyStdio for LegacyConsole {
-    fn getchar(&self) -> u8 {
-        unimplemented!()
-    }
-
-    fn putchar(&self, ch: u8) {
-        let uart = unsafe { &*UART0::ptr() };
-        // 等待 FIFO 空位
-        while uart.usr.read().tfnf().is_full() {
-            core::hint::spin_loop();
-        }
-        uart.thr().write(|w| w.thr().variant(ch));
+pub(crate) fn init() {
+    unsafe {
+        SBI = MaybeUninit::new(
+            rustsbi::Builder::new_machine()
+                .with_timer(&Impl)
+                .with_ipi(&Impl)
+                .with_reset(&Impl)
+                .build(),
+        )
     }
 }
 
-impl rustsbi::Timer for Timer {
+#[inline]
+pub(crate) fn sbi() -> &'static mut FixedRustSBI<'static> {
+    unsafe { SBI.assume_init_mut() }
+}
+
+impl rustsbi::Timer for Impl {
     fn set_timer(&self, stime_value: u64) {
         unsafe {
             let clint = &*hal::pac::CLINT::PTR;
@@ -43,7 +40,7 @@ impl rustsbi::Timer for Timer {
     }
 }
 
-impl rustsbi::Reset for Reset {
+impl rustsbi::Reset for Impl {
     fn system_reset(&self, _reset_type: u32, _reset_reason: u32) -> SbiRet {
         print!("[rustsbi] system reset ");
         let mut arrow = common::Arrow::init(25, |arr| {
@@ -58,7 +55,7 @@ impl rustsbi::Reset for Reset {
     }
 }
 
-impl rustsbi::Ipi for Ipi {
+impl rustsbi::Ipi for Impl {
     fn send_ipi(&self, hart_mask: HartMask) -> SbiRet {
         if hart_mask.has_bit(0) {
             unsafe { (*(CLINT_BASE as *const Clint)).set_msip(0) };

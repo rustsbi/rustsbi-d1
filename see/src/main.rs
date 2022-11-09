@@ -7,11 +7,12 @@ mod extensions;
 mod hart_csr_utils;
 mod trap_vec;
 
-#[macro_use] // for print
-extern crate rustsbi;
+#[macro_use]
+extern crate rcore_console;
 
 use common::memory;
 use core::{arch::asm, ops::Range, panic::PanicInfo};
+use hal::pac::UART0;
 
 /// 特权软件信息。
 struct Supervisor {
@@ -56,7 +57,8 @@ extern "C" fn rust_main() {
         static mut ebss: u64;
     }
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
-
+    rcore_console::init_console(&Console);
+    rcore_console::set_log_level(option_env!("LOG"));
     extensions::init();
 
     let meta = Meta::static_ref();
@@ -214,5 +216,19 @@ fn arrow_walk() -> ! {
         for _ in 0..0x40_0000 {
             core::hint::spin_loop();
         }
+    }
+}
+
+struct Console;
+
+impl rcore_console::Console for Console {
+    #[inline]
+    fn put_char(&self, c: u8) {
+        let uart = unsafe { &*UART0::ptr() };
+        // 等待 FIFO 空位
+        while uart.usr.read().tfnf().is_full() {
+            core::hint::spin_loop();
+        }
+        uart.thr().write(|w| w.thr().variant(c));
     }
 }

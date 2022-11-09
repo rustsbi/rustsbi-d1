@@ -304,6 +304,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd7a31eed1591dcbc95d92ad7161908e72f4677f8fabf2a32ca49b4237cbf211"
 
 [[package]]
+name = "rcore-console"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63aae49a6d2e6fd69821507a979b5871e4c47dc3abc9066347fa5c4a51a73dd6"
+dependencies = [
+ "log",
+ "spin",
+]
+
+[[package]]
 name = "regex"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -396,6 +406,7 @@ dependencies = [
  "common",
  "hal",
  "r0",
+ "rcore-console",
  "riscv 0.9.0",
  "rustsbi",
 ]
@@ -457,6 +468,7 @@ dependencies = [
  "hal",
  "log",
  "r0",
+ "rcore-console",
  "riscv 0.9.0",
  "sbi-testing",
  "spin",
