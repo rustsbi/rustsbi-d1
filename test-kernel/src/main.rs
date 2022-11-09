@@ -72,6 +72,11 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
     }
     .test();
 
+    // 测试完整路径
+    let time: usize;
+    unsafe { asm!("rdtime s5", out("s5") time) };
+    println!("read time to s5: {time}");
+
     // 测试调用延迟
     let t0 = time::read();
 

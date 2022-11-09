@@ -13,9 +13,10 @@ extern crate rcore_console;
 
 use common::memory;
 use core::{arch::asm, ops::Range, panic::PanicInfo};
-use fast_trap::{FastContext, FastResult, FlowContext};
+use fast_trap::{EntireContext, EntireResult, FastContext, FastResult, FlowContext};
 use hal::pac::UART0;
 use riscv_spec::*;
+use sbi_spec::binary::SbiRet;
 use trap_stack::Stack;
 
 const STACK_SIZE: usize = 4096;
@@ -140,6 +141,7 @@ mod cause {
     pub(crate) const BOOT: usize = 24;
 }
 
+#[inline(never)]
 extern "C" fn fast_handler(
     mut ctx: FastContext,
     a1: usize,
@@ -152,7 +154,7 @@ extern "C" fn fast_handler(
 ) -> FastResult {
     use riscv::register::{
         mcause::{self, Exception as E, Interrupt as I, Trap as T},
-        mtval,
+        mtval, time,
     };
 
     let cause = mcause::read();
@@ -173,47 +175,33 @@ extern "C" fn fast_handler(
     match cause.cause() {
         // SBI call
         T::Exception(E::SupervisorEnvCall) => {
-            let ret = extensions::sbi().handle_ecall(a7, a6, [ctx.a0(), a1, a2, a3, a4, a5]);
-            // if ret.is_ok() {
-            //     match a7 {
-            //         base::EID_BASE
-            //             if a6 == base::PROBE_EXTENSION
-            //                 && matches!(
-            //                     ctx.a0(),
-            //                     legacy::LEGACY_CONSOLE_PUTCHAR | legacy::LEGACY_CONSOLE_GETCHAR
-            //                 ) =>
-            //         {
-            //             ret.value = 1;
-            //         }
-            //         _ => {}
-            //     }
-            // } else {
-            //     match a7 {
-            //         legacy::LEGACY_CONSOLE_PUTCHAR => {
-            //             print!("{}", ctx.a0() as u8 as char);
-            //             ret.error = 0;
-            //             ret.value = a1;
-            //         }
-            //         legacy::LEGACY_CONSOLE_GETCHAR => {
-            //             ret.error = unsafe { UART.lock().assume_init_mut() }.receive() as _;
-            //             ret.value = a1;
-            //         }
-            //         _ => {}
-            //     }
-            // }
+            use sbi_spec::{base, legacy};
+            let mut ret = extensions::sbi().handle_ecall(a7, a6, [ctx.a0(), a1, a2, a3, a4, a5]);
+            if ret.is_ok() {
+                if a7 == base::EID_BASE
+                    && a6 == base::PROBE_EXTENSION
+                    && ctx.a0() == legacy::LEGACY_CONSOLE_PUTCHAR
+                {
+                    ret.value = 1;
+                }
+            } else {
+                if a7 == legacy::LEGACY_CONSOLE_PUTCHAR {
+                    print!("{}", ctx.a0() as u8 as char);
+                    ret = SbiRet::success(a1);
+                }
+            }
             ctx.regs().a = [ret.error, ret.value, a2, a3, a4, a5, a6, a7];
             mepc::next();
             ctx.restore()
         }
         // rdtime?
         T::Exception(E::IllegalInstruction) => {
-            use riscv::register::time;
-
             let ins = mtval::read();
             const RD_MASK: usize = ((1 << 5) - 1) << 7;
             if ins & !RD_MASK == 0xC0102073 {
                 // rdtime is actually a csrrw instruction
 
+                ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
                 let rd = (ins & RD_MASK) >> RD_MASK.trailing_zeros();
                 match rd {
                     0 => {}
@@ -222,9 +210,11 @@ extern "C" fn fast_handler(
                     3 => ctx.regs().gp = time::read(),
                     4 => ctx.regs().tp = time::read(),
                     5..=7 => ctx.regs().t[rd - 5] = time::read(),
+                    8..=9 => return ctx.continue_with(entire_handler, rd - 8),
                     10..=17 => ctx.regs().a[rd - 10] = time::read(),
+                    18..=27 => return ctx.continue_with(entire_handler, rd - 18 + 2),
                     28..=31 => ctx.regs().t[rd - 28 + 3] = time::read(),
-                    _ => todo!("rd = x{rd}"),
+                    _ => panic!("invalid rd: x{rd}"),
                 }
                 mepc::next();
                 ctx.restore()
@@ -250,6 +240,15 @@ extern "C" fn fast_handler(
             panic!("stopped with unsupported trap")
         }
     }
+}
+
+#[inline(never)]
+extern "C" fn entire_handler(ctx: EntireContext<usize>) -> EntireResult {
+    let (mut ctx, rd) = ctx.split();
+    ctx.regs().s[rd.get()] = riscv::register::time::read();
+
+    mepc::next();
+    ctx.restore()
 }
 
 /// 设置 PMP。
