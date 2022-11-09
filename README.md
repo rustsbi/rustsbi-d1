@@ -77,23 +77,30 @@ no payload |                     <<                           |
   |_|\___||___/\__| |_|\_\___|_|  |_| |_|\___|_|
 ================================================
 | boot hart id          |                    0 |
+| smp                   |                    1 |
+| timebase frequency    |          24000000 Hz |
 | dtb physical address  |           0x7fe00000 |
 ------------------------------------------------
-[test-kernel] Testing Base
-[test-kernel] sbi spec version = 1.0
-[test-kernel] sbi impl = RustSBI
-[test-kernel] sbi impl version = 0x300
-[test-kernel] sbi extensions = [Base, TIME, sPI, SRST]
-[test-kernel] mvendor id = 0x5b7
-[test-kernel] march id = 0x5b7
-[test-kernel] mimp id = 0x5b7
-[test-kernel] Testing TIME
-[test-kernel] read time register successfuly, set timer +1s
-[test-kernel] timer interrupt delegate successfuly
-[test-kernel] Testing sPI
-[test-kernel] send ipi successfuly
-[test-kernel] SBI test PASSED
-[rustsbi] system reset |                   >> |
+[ INFO] Testing Base
+[ INFO] sbi spec version = 1.0
+[ INFO] sbi impl = RustSBI
+[ INFO] sbi impl version = 0x300
+[ INFO] sbi extensions = [Base, TIME, sPI, SRST]
+[ INFO] mvendor id = 0x5b7
+[ INFO] march id = 0x0
+[ INFO] mimp id = 0x0
+[ INFO] Sbi Base Test Pass
+[ INFO] Testing TIME
+[ INFO] read time register successfuly, set timer +1s
+[ INFO] timer interrupt delegate successfuly
+[ INFO] Sbi TIME Test Pass
+[ INFO] Testing sPI
+[ INFO] send ipi successfuly
+[ INFO] Sbi sPI Test Pass
+[ERROR] Sbi HSM Not Exist
+[ INFO] marchid duration = 13468308
+[ INFO] ipi duration = 28632525
+[rustsbi] system reset |                   >>  |
 ```
 
 ## 加载过程
