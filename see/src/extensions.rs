@@ -23,7 +23,7 @@ pub(crate) fn init() {
 }
 
 #[inline]
-pub(crate) fn sbi() -> &'static mut FixedRustSBI<'static> {
+pub(crate) fn sbi<'a>() -> &'static mut FixedRustSBI<'a> {
     unsafe { SBI.assume_init_mut() }
 }
 

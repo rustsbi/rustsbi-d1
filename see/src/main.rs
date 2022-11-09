@@ -2,9 +2,10 @@
 #![no_main]
 #![feature(naked_functions, asm_const)]
 
-mod execute;
 mod extensions;
 mod hart_csr_utils;
+mod riscv_spec;
+mod trap_stack;
 mod trap_vec;
 
 #[macro_use]
@@ -12,13 +13,23 @@ extern crate rcore_console;
 
 use common::memory;
 use core::{arch::asm, ops::Range, panic::PanicInfo};
+use fast_trap::{FastContext, FastResult, FlowContext};
 use hal::pac::UART0;
+use riscv_spec::*;
+use trap_stack::Stack;
 
-/// 特权软件信息。
-struct Supervisor {
-    start_addr: usize,
-    opaque: usize,
-}
+const STACK_SIZE: usize = 4096;
+
+/// 栈空间。
+#[link_section = ".bss.uninit"]
+static mut ROOT_STACK: Stack = Stack::ZERO;
+
+static mut SUPERVISOR: Supervisor = Supervisor {
+    start_addr: 0,
+    opaque: 0,
+};
+
+static mut CONTEXT: FlowContext = FlowContext::ZERO;
 
 /// 入口。
 ///
@@ -33,24 +44,23 @@ struct Supervisor {
 #[no_mangle]
 #[link_section = ".text.entry"]
 unsafe extern "C" fn _start() -> ! {
-    const STACK_SIZE: usize = 4096;
-    #[link_section = ".bss.uninit"]
-    static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-
     asm!(
-        "   la sp, {stack} + {stack_size}
-            j  {rust_main}
+        "   la   sp, {stack} + {stack_size}
+            call {move_stack}
+            call {rust_main}
+            j    {trap}
         ",
         stack_size = const STACK_SIZE,
-        stack      =   sym STACK,
+        stack      =   sym ROOT_STACK,
+        move_stack =   sym fast_trap::reuse_stack_for_trap,
         rust_main  =   sym rust_main,
+        trap       =   sym trap_vec::trap_vec,
         options(noreturn),
     )
 }
 
 extern "C" fn rust_main() {
-    use common::memory::*;
-    use execute::execute_supervisor;
+    use memory::*;
 
     extern "C" {
         static mut sbss: u64;
@@ -59,7 +69,6 @@ extern "C" fn rust_main() {
     unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
     rcore_console::init_console(&Console);
     rcore_console::set_log_level(option_env!("LOG"));
-    extensions::init();
 
     let meta = Meta::static_ref();
     let board_info = match meta.dtb() {
@@ -106,10 +115,140 @@ extern "C" fn rust_main() {
 
         let dtb = board_info.as_ref().map_or(0, |i| i.dtb.start);
         println!("execute_supervisor at {kernel:#x} with a1 = {dtb:#x}");
-        execute_supervisor(Supervisor {
-            start_addr: kernel,
-            opaque: dtb,
-        })
+
+        extensions::init();
+        // 准备启动调度
+        unsafe {
+            use riscv::register::medeleg;
+            asm!("csrw mcause,  {}", in(reg) cause::BOOT);
+            asm!("csrw mideleg, {}", in(reg) !0);
+            asm!("csrw medeleg, {}", in(reg) !0);
+            medeleg::clear_supervisor_env_call();
+            medeleg::clear_machine_env_call();
+            medeleg::clear_illegal_instruction();
+            trap_vec::load(true);
+            ROOT_STACK.prepare_for_trap();
+            SUPERVISOR = Supervisor {
+                start_addr: kernel,
+                opaque: dtb,
+            };
+        }
+    }
+}
+
+mod cause {
+    pub(crate) const BOOT: usize = 24;
+}
+
+extern "C" fn fast_handler(
+    mut ctx: FastContext,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+    a6: usize,
+    a7: usize,
+) -> FastResult {
+    use riscv::register::{
+        mcause::{self, Exception as E, Interrupt as I, Trap as T},
+        mtval,
+    };
+
+    let cause = mcause::read();
+    // 启动
+    if (cause.cause() == T::Exception(E::Unknown) && cause.bits() == cause::BOOT)
+        || cause.cause() == T::Interrupt(I::MachineSoft)
+    {
+        mstatus::update(|bits| {
+            *bits &= !mstatus::MPP;
+            *bits |= mstatus::MPIE | mstatus::MPP_SUPERVISOR;
+        });
+        mie::write(mie::MSIE | mie::MTIE | mie::MEIE);
+        ctx.regs().a[0] = 0;
+        ctx.regs().a[1] = unsafe { SUPERVISOR.opaque };
+        ctx.regs().pc = unsafe { SUPERVISOR.start_addr };
+        return ctx.call(2);
+    }
+    match cause.cause() {
+        // SBI call
+        T::Exception(E::SupervisorEnvCall) => {
+            let ret = extensions::sbi().handle_ecall(a7, a6, [ctx.a0(), a1, a2, a3, a4, a5]);
+            // if ret.is_ok() {
+            //     match a7 {
+            //         base::EID_BASE
+            //             if a6 == base::PROBE_EXTENSION
+            //                 && matches!(
+            //                     ctx.a0(),
+            //                     legacy::LEGACY_CONSOLE_PUTCHAR | legacy::LEGACY_CONSOLE_GETCHAR
+            //                 ) =>
+            //         {
+            //             ret.value = 1;
+            //         }
+            //         _ => {}
+            //     }
+            // } else {
+            //     match a7 {
+            //         legacy::LEGACY_CONSOLE_PUTCHAR => {
+            //             print!("{}", ctx.a0() as u8 as char);
+            //             ret.error = 0;
+            //             ret.value = a1;
+            //         }
+            //         legacy::LEGACY_CONSOLE_GETCHAR => {
+            //             ret.error = unsafe { UART.lock().assume_init_mut() }.receive() as _;
+            //             ret.value = a1;
+            //         }
+            //         _ => {}
+            //     }
+            // }
+            ctx.regs().a = [ret.error, ret.value, a2, a3, a4, a5, a6, a7];
+            mepc::next();
+            ctx.restore()
+        }
+        // rdtime?
+        T::Exception(E::IllegalInstruction) => {
+            use riscv::register::time;
+
+            let ins = mtval::read();
+            const RD_MASK: usize = ((1 << 5) - 1) << 7;
+            if ins & !RD_MASK == 0xC0102073 {
+                // rdtime is actually a csrrw instruction
+
+                let rd = (ins & RD_MASK) >> RD_MASK.trailing_zeros();
+                match rd {
+                    0 => {}
+                    1 => ctx.regs().ra = time::read(),
+                    2 => ctx.regs().sp = time::read(),
+                    3 => ctx.regs().gp = time::read(),
+                    4 => ctx.regs().tp = time::read(),
+                    5..=7 => ctx.regs().t[rd - 5] = time::read(),
+                    10..=17 => ctx.regs().a[rd - 10] = time::read(),
+                    28..=31 => ctx.regs().t[rd - 28 + 3] = time::read(),
+                    _ => todo!("rd = x{rd}"),
+                }
+                mepc::next();
+                ctx.restore()
+            } else {
+                todo!("known")
+            }
+        }
+        // 其他陷入
+        trap => {
+            println!(
+                "
+-----------------------------
+> trap:    {trap:?}
+> mstatus: {:#018x}
+> mepc:    {:#018x}
+> mtval:   {:#018x}
+-----------------------------
+            ",
+                mstatus::read(),
+                mepc::read(),
+                mtval::read()
+            );
+            panic!("stopped with unsupported trap")
+        }
     }
 }
 
@@ -134,6 +273,45 @@ fn set_pmp(mem: core::ops::Range<usize>, kernel: usize) {
     }
 }
 
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{info}");
+    arrow_walk()
+}
+
+fn arrow_walk() -> ! {
+    print!("[rustsbi] no kernel ");
+    let mut arrow = common::Arrow::init(51, |arr| {
+        print!("{}", unsafe { core::str::from_utf8_unchecked(arr) })
+    });
+    loop {
+        arrow.next();
+        for _ in 0..0x40_0000 {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+/// 特权软件信息。
+struct Supervisor {
+    start_addr: usize,
+    opaque: usize,
+}
+
+struct Console;
+
+impl rcore_console::Console for Console {
+    #[inline]
+    fn put_char(&self, c: u8) {
+        let uart = unsafe { &*UART0::ptr() };
+        // 等待 FIFO 空位
+        while uart.usr.read().tfnf().is_full() {
+            core::hint::spin_loop();
+        }
+        uart.thr().write(|w| w.thr().variant(c));
+    }
+}
+
 /// 从设备树采集的板信息。
 struct BoardInfo {
     pub dtb: Range<usize>,
@@ -147,14 +325,6 @@ struct StringInline<const N: usize>(usize, [u8; N]);
 impl<const N: usize> StringInline<N> {
     pub fn as_str(&self) -> &str {
         unsafe { core::str::from_utf8_unchecked(&self.1[..self.0]) }
-    }
-}
-
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{info}");
-    loop {
-        core::hint::spin_loop();
     }
 }
 
@@ -207,31 +377,4 @@ fn parse_board_info(addr: usize) -> Option<BoardInfo> {
         DtbObj::Property(_) => StepOver,
     });
     Some(ans)
-}
-
-fn arrow_walk() -> ! {
-    print!("[rustsbi] no kernel ");
-    let mut arrow = common::Arrow::init(51, |arr| {
-        print!("{}", unsafe { core::str::from_utf8_unchecked(arr) })
-    });
-    loop {
-        arrow.next();
-        for _ in 0..0x40_0000 {
-            core::hint::spin_loop();
-        }
-    }
-}
-
-struct Console;
-
-impl rcore_console::Console for Console {
-    #[inline]
-    fn put_char(&self, c: u8) {
-        let uart = unsafe { &*UART0::ptr() };
-        // 等待 FIFO 空位
-        while uart.usr.read().tfnf().is_full() {
-            core::hint::spin_loop();
-        }
-        uart.thr().write(|w| w.thr().variant(c));
-    }
 }
