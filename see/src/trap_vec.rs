@@ -54,26 +54,23 @@ unsafe extern "C" fn mtimer() {
         // mscratch: S sp
         "   csrrw sp, mscratch, sp",
         // 保护
-        "   sd    ra, -1*8(sp)
-            sd    a0, -2*8(sp)
-            sd    a1, -3*8(sp)
-            sd    a2, -4*8(sp)
+        "   sd    a0, -1*8(sp)
+            sd    a1, -2*8(sp)
         ",
         // 清除 mtimecmp
-        "   li    a0, {clint}
-            mv    a1, zero
-            li    a2, {u64_max}
-            call  {set_mtimecmp}
+        "   li    a0, {clint} + 0x4000
+            addi  a1, zero, -1
+            sw    a1, (a0)
+            addi  a0, a0, 4
+            sw    a1, (a0)
         ",
         // 设置 stip
         "   li    a0, {mip_stip}
             csrrs zero, mip, a0
         ",
         // 恢复
-        "   ld    ra, -1*8(sp)
-            ld    a0, -2*8(sp)
-            ld    a1, -3*8(sp)
-            ld    a2, -4*8(sp)
+        "   ld    a0, -1*8(sp)
+            ld    a1, -2*8(sp)
         ",
         // 换栈：
         // sp      : S sp
@@ -81,11 +78,8 @@ unsafe extern "C" fn mtimer() {
         "   csrrw sp, mscratch, sp",
         // 返回
         "   mret",
-        u64_max      = const u64::MAX,
-        mip_stip     = const 1 << 5,
-        clint        = const CLINT_BASE,
-        //                   Clint::write_mtimecmp_naked(&self, hart_idx, val)
-        set_mtimecmp =   sym Clint::write_mtimecmp_naked,
+        mip_stip = const 1 << 5,
+        clint    = const CLINT_BASE,
         options(noreturn)
     )
 }

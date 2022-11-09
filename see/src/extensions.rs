@@ -33,9 +33,11 @@ impl rustsbi::legacy_stdio::LegacyStdio for LegacyConsole {
 impl rustsbi::Timer for Timer {
     fn set_timer(&self, stime_value: u64) {
         unsafe {
-            ((CLINT_BASE + 0x4000) as *mut u32).write_volatile(stime_value as _);
-            ((CLINT_BASE + 0x4004) as *mut u32).write_volatile((stime_value >> u32::BITS) as _);
-            // (*(hal::CLINT_BASE as *const Clint)).write_mtimecmp_naked(0, stime_value);
+            let clint = &*hal::pac::CLINT::PTR;
+            clint.mtimecmpl.write(|w| w.bits(stime_value as _));
+            clint
+                .mtimecmph
+                .write(|w| w.bits((stime_value >> u32::BITS) as _));
             mip::clear_stimer();
         }
     }
