@@ -70,12 +70,6 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
     }
     .test();
 
-    // 打开软中断
-    unsafe {
-        asm!("csrw sip, zero");
-        sie::set_ssoft();
-        sstatus::set_sie();
-    };
     // 测试调用延迟
     let t0 = time::read();
 
@@ -85,24 +79,35 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
 
     let t1 = time::read();
     log::info!("marchid duration = {}", t1 - t0);
+
+    // 打开软中断
+    unsafe {
+        asm!("csrw sip, zero", options(nomem));
+        sie::set_ssoft();
+        sstatus::set_sie();
+    };
     // 测试中断响应延迟
     let t0 = time::read();
 
-    for _ in 0..0xffff {
+    for _ in 0..0x20000 {
         unsafe {
             core::arch::asm!(
                 "   la   {0}, 1f
                     csrw stvec, {0}
+                    mv   a0, a2
+                    mv   a1, zero
                     ecall
                     wfi
                 .align 2
-                1:
+                1:  csrrci zero, sip, 1 << 1
+
                 ",
                 out(reg) _,
                 in("a7") 0x735049,
                 in("a6") 0,
-                in("a0") 1 << hartid,
+                in("a0") 0,
                 in("a1") 0,
+                in("a2") 1 << hartid,
                 options(nomem),
             );
         }
