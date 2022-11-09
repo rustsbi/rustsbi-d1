@@ -5,22 +5,11 @@
 #![feature(naked_functions, asm_const)]
 
 use core::arch::asm;
+use riscv::register::*;
 use sbi_testing::sbi;
 
 #[macro_use]
 mod console;
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    let (hard_id, pc): (usize, usize);
-    unsafe { asm!("mv    {}, tp", out(reg) hard_id) };
-    unsafe { asm!("auipc {},  0", out(reg) pc) };
-    println!("[test-kernel-panic] hart {hard_id} {info}");
-    println!("[test-kernel-panic] pc = {pc:#x}");
-    println!("[test-kernel-panic] SBI test FAILED due to panic");
-    sbi::system_reset(sbi::Shutdown, sbi::SystemFailure);
-    loop {}
-}
 
 /// 内核入口。
 ///
@@ -81,6 +70,59 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
     }
     .test();
 
+    // 打开软中断
+    unsafe {
+        asm!("csrw sip, zero");
+        sie::set_ssoft();
+        sstatus::set_sie();
+    };
+    // 测试调用延迟
+    let t0 = time::read();
+
+    for _ in 0..0xffff {
+        let _ = sbi::get_marchid();
+    }
+
+    let t1 = time::read();
+    log::info!("marchid duration = {}", t1 - t0);
+    // 测试中断响应延迟
+    let t0 = time::read();
+
+    for _ in 0..0xffff {
+        unsafe {
+            core::arch::asm!(
+                "   la   {0}, 1f
+                    csrw stvec, {0}
+                    ecall
+                    wfi
+                .align 2
+                1:
+                ",
+                out(reg) _,
+                in("a7") 0x735049,
+                in("a6") 0,
+                in("a0") 1 << hartid,
+                in("a1") 0,
+                options(nomem),
+            );
+        }
+    }
+
+    let t1 = time::read();
+    log::info!("ipi duration = {}", t1 - t0);
+
     sbi::system_reset(sbi::Shutdown, sbi::NoReason);
     unreachable!()
+}
+
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    let (hard_id, pc): (usize, usize);
+    unsafe { asm!("mv    {}, tp", out(reg) hard_id) };
+    unsafe { asm!("auipc {},  0", out(reg) pc) };
+    println!("[test-kernel-panic] hart {hard_id} {info}");
+    println!("[test-kernel-panic] pc = {pc:#x}");
+    println!("[test-kernel-panic] SBI test FAILED due to panic");
+    sbi::system_reset(sbi::Shutdown, sbi::SystemFailure);
+    loop {}
 }
