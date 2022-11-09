@@ -12,6 +12,7 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 rustsbi = { version = "0.3.0", features = ["legacy"] }
+aclint = "0.0.0"
 riscv = "0.9.0"
 r0 = "1"
 hal = { path = "../hal", features = ["m-mode"] }

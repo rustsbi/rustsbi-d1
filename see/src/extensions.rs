@@ -1,7 +1,5 @@
-use hal::{
-    clint::{msip, mtimecmp},
-    pac::UART0,
-};
+use aclint::SifiveClint as Clint;
+use hal::{pac::UART0, CLINT_BASE};
 use riscv::register::mip;
 use rustsbi::{spec::binary::SbiRet, HartMask};
 
@@ -34,8 +32,12 @@ impl rustsbi::legacy_stdio::LegacyStdio for LegacyConsole {
 
 impl rustsbi::Timer for Timer {
     fn set_timer(&self, stime_value: u64) {
-        mtimecmp::write(stime_value);
-        unsafe { mip::clear_stimer() };
+        unsafe {
+            ((CLINT_BASE + 0x4000) as *mut u32).write_volatile(stime_value as _);
+            ((CLINT_BASE + 0x4004) as *mut u32).write_volatile((stime_value >> u32::BITS) as _);
+            // (*(hal::CLINT_BASE as *const Clint)).write_mtimecmp_naked(0, stime_value);
+            mip::clear_stimer();
+        }
     }
 }
 
@@ -57,7 +59,7 @@ impl rustsbi::Reset for Reset {
 impl rustsbi::Ipi for Ipi {
     fn send_ipi(&self, hart_mask: HartMask) -> SbiRet {
         if hart_mask.has_bit(0) {
-            msip::set();
+            unsafe { (*(CLINT_BASE as *const Clint)).set_msip(0) };
         }
         SbiRet::success(0)
     }

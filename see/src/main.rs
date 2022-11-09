@@ -5,6 +5,7 @@
 mod execute;
 mod extensions;
 mod hart_csr_utils;
+mod trap_vec;
 
 #[macro_use] // for print
 extern crate rustsbi;
@@ -150,12 +151,6 @@ fn panic(info: &PanicInfo) -> ! {
     loop {
         core::hint::spin_loop();
     }
-}
-
-#[inline(always)]
-unsafe fn set_mtvec(trap_handler: usize) {
-    use riscv::register::mtvec;
-    mtvec::write(trap_handler, mtvec::TrapMode::Direct);
 }
 
 fn parse_board_info(addr: usize) -> Option<BoardInfo> {
