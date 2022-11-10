@@ -80,7 +80,17 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
     // 测试调用延迟
     let t0 = time::read();
 
-    for _ in 0..0xffff {
+    for _ in 0..100_0000 {
+        let _ = sbi::get_spec_version();
+    }
+
+    let t1 = time::read();
+    log::info!("spec_version duration = {}", t1 - t0);
+
+    // 测试调用延迟
+    let t0 = time::read();
+
+    for _ in 0..100_0000 {
         let _ = sbi::get_marchid();
     }
 
@@ -89,27 +99,27 @@ extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
 
     // 打开软中断
     unsafe {
-        asm!("csrw sip, zero", options(nomem));
+        core::arch::asm!("csrci sip, {ssip}", ssip = const 1 << 1);
         sie::set_ssoft();
-        sstatus::set_sie();
-    };
+    }
     // 测试中断响应延迟
     let t0 = time::read();
-
-    for _ in 0..0x20000 {
+    for _ in 0..100_0000 {
         unsafe {
+            sstatus::set_sie();
             core::arch::asm!(
-                "   la   {0}, 1f
-                    csrw stvec, {0}
-                    mv   a0, a2
-                    mv   a1, zero
+                "   la    {0}, 1f
+                    csrw  stvec, {0}
+                    mv    a0, a2
+                    mv    a1, zero
                     ecall
-                    wfi
-                .align 2
-                1:  csrrci zero, sip, 1 << 1
-
+                 0: wfi
+                    j 0b
+                 .align 2
+                 1: csrci sip, {ssip}
                 ",
                 out(reg) _,
+                ssip = const 1 << 1,
                 in("a7") 0x735049,
                 in("a6") 0,
                 in("a0") 0,
