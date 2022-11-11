@@ -259,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "os_str_bytes"
-version = "6.3.1"
+version = "6.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3baf96e39c5359d2eb0dd6ccb42c62b91d9678aa68160d261b9e0ccbf9e9dea9"
+checksum = "7b5bf27447411e9ee3ff51186bf7a08e16c341efdde93f4d823e8844429bed7e"
 
 [[package]]
 name = "proc-macro-error"
@@ -304,12 +304,6 @@ checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
 dependencies = [
  "proc-macro2",
 ]
-
-[[package]]
-name = "r0"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd7a31eed1591dcbc95d92ad7161908e72f4677f8fabf2a32ca49b4237cbf211"
 
 [[package]]
 name = "rcore-console"
@@ -414,7 +408,6 @@ dependencies = [
  "common",
  "fast-trap",
  "hal",
- "r0",
  "rcore-console",
  "riscv 0.9.0",
  "rustsbi",
@@ -436,7 +429,6 @@ version = "0.1.0"
 dependencies = [
  "common",
  "hal",
- "r0",
 ]
 
 [[package]]
@@ -477,7 +469,6 @@ version = "0.1.0"
 dependencies = [
  "hal",
  "log",
- "r0",
  "rcore-console",
  "riscv 0.9.0",
  "sbi-testing",

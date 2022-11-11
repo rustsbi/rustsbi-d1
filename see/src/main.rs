@@ -64,10 +64,17 @@ extern "C" fn rust_main() {
     use memory::*;
 
     extern "C" {
-        static mut sbss: u64;
-        static mut ebss: u64;
+        fn sbss();
+        fn ebss();
     }
-    unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
+    unsafe {
+        let mut ptr = sbss as usize as *mut u8;
+        let end = ebss as usize as *mut u8;
+        while ptr < end {
+            ptr.write(0);
+            ptr = ptr.offset(1);
+        }
+    };
     rcore_console::init_console(&Console);
     rcore_console::set_log_level(option_env!("LOG"));
 
@@ -166,7 +173,7 @@ extern "C" fn fast_handler(
             *bits &= !mstatus::MPP;
             *bits |= mstatus::MPIE | mstatus::MPP_SUPERVISOR;
         });
-        mie::write(mie::MSIE | mie::MTIE | mie::MEIE);
+        mie::write(mie::MSIE | mie::MTIE);
         ctx.regs().a[0] = 0;
         ctx.regs().a[1] = unsafe { SUPERVISOR.opaque };
         ctx.regs().pc = unsafe { SUPERVISOR.start_addr };

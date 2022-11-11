@@ -139,10 +139,17 @@ extern "C" fn main() -> usize {
     use logging::*;
     // 清空 bss
     extern "C" {
-        static mut sbss: u64;
-        static mut ebss: u64;
+        fn sbss();
+        fn ebss();
     }
-    unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
+    unsafe {
+        let mut ptr = sbss as usize as *mut u8;
+        let end = ebss as usize as *mut u8;
+        while ptr < end {
+            ptr.write(0);
+            ptr = ptr.offset(1);
+        }
+    };
     let _ = Out << LOGO << Endl;
     // 如果不是从 flash 引导的，直接按照 dram 放好的位置跳
     let meta = unsafe { (&META as *const MemMeta).read_volatile() };

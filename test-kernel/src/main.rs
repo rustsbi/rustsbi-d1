@@ -39,10 +39,17 @@ unsafe extern "C" fn _start(hartid: usize, device_tree_paddr: usize) -> ! {
 extern "C" fn rust_main(hartid: usize, dtb_pa: usize) -> ! {
     // 清空 bss
     extern "C" {
-        static mut sbss: u64;
-        static mut ebss: u64;
+        fn sbss();
+        fn ebss();
     }
-    unsafe { r0::zero_bss(&mut sbss, &mut ebss) };
+    unsafe {
+        let mut ptr = sbss as usize as *mut u8;
+        let end = ebss as usize as *mut u8;
+        while ptr < end {
+            ptr.write(0);
+            ptr = ptr.offset(1);
+        }
+    };
     rcore_console::init_console(&Console);
     rcore_console::set_log_level(option_env!("LOG"));
 

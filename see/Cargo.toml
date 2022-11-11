@@ -14,7 +14,6 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 rustsbi = "0.3.0"
 sbi-spec = { version = "0.0.4", features = ["legacy"] }
 riscv = "0.9"
-r0 = "1"
 aclint = "0.0.0"
 rcore-console = "0.0.0"
 
