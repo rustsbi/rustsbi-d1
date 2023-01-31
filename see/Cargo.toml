@@ -4,21 +4,18 @@ cargo-features = ["per-package-target"]
 name = "see"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
 forced-target = "riscv64imac-unknown-none-elf"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustsbi = "0.3.0"
+rustsbi = "0.3.1"
 sbi-spec = { version = "0.0.4", features = ["legacy"] }
-riscv = "0.9"
+riscv = "0.10.1"
 aclint = "0.0.0"
 rcore-console = "0.0.0"
 
 hal = { path = "../hal" }
 common = { path = "../common" }
-fast-trap = { git = "https://github.com/YdrMaster/fast-trap", rev = "5026ee4", features = [
-    "riscv-m",
-] }
+fast-trap = { version = "=0.0.1", features = ["riscv-m"] }

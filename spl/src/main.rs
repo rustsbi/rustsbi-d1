@@ -164,7 +164,7 @@ extern "C" fn main() -> usize {
         let _ = Out << "boot from brom" << Endl;
     }
     // 初始化 spi
-    let p = Peripherals::take().unwrap();
+    let p = unsafe { Peripherals::steal() };
     let clocks = Clocks {
         psi: 600_000_000.hz(),
         apb1: 24_000_000.hz(),

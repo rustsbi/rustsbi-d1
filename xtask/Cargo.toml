@@ -7,10 +7,10 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.1", features = ["derive"] }
 clap-verbosity-flag = "2.0"
 log = "0.4.17"
 env_logger = "0.9"
-once_cell = "1.16.0"
+once_cell = "1.17.0"
 os-xtask-utils = "0.0.0"
 common = { path = "../common" }

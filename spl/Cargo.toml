@@ -2,9 +2,8 @@ cargo-features = ["per-package-target"]
 
 [package]
 name = "spl"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
-build = "build.rs"
 forced-target = "riscv64imac-unknown-none-elf"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 
