@@ -11,6 +11,7 @@ use common::{
     memory::{dtb_offset, parse_memory_size, Meta as MemMeta, DRAM, KERNEL},
     AsBinary, EgonHead,
 };
+use core::ptr::addr_of;
 use core::{arch::asm, panic::PanicInfo};
 use logging::*;
 
@@ -152,7 +153,7 @@ extern "C" fn main() -> usize {
     };
     let _ = Out << LOGO << Endl;
     // 如果不是从 flash 引导的，直接按照 dram 放好的位置跳
-    let meta = unsafe { (&META as *const MemMeta).read_volatile() };
+    let meta = unsafe { addr_of!(META).read_volatile() };
     if !meta.from_flash {
         let _ = Out << "boot from fel" << Endl;
         if meta.see == !0 {
