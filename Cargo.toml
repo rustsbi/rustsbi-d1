@@ -1,6 +1,12 @@
 [workspace]
+resolver = "2"
 members = ["common", "hal", "spl", "see", "test-kernel", "xtask"]
 default-members = ["xtask"]
+
+[workspace.package]
+edition = "2021"
+license = "MulanPSL-2.0 OR MIT"
+repository = "https://github.com/rustsbi/rustsbi-d1"
 
 [profile.release]
 lto = true
