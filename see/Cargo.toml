@@ -13,9 +13,9 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustsbi = "0.3.1"
-sbi-spec = { version = "0.0.4", features = ["legacy"] }
-riscv = "0.10.1"
+rustsbi = "0.3.2"
+sbi-spec = { version = "0.0.7", features = ["legacy"] }
+riscv = "0.11.1"
 aclint = "0.0.0"
 rcore-console = "0.0.0"
 

@@ -16,7 +16,7 @@ use core::{arch::asm, ops::Range, panic::PanicInfo};
 use fast_trap::{EntireContext, EntireResult, FastContext, FastResult, FlowContext};
 use hal::pac::UART0;
 use riscv_spec::*;
-use sbi_spec::binary::SbiRet;
+use rustsbi::spec::binary::SbiRet;
 use trap_stack::Stack;
 
 const STACK_SIZE: usize = 4096;
@@ -132,7 +132,6 @@ extern "C" fn rust_main() {
             asm!("csrw mideleg, {}", in(reg) !0);
             asm!("csrw medeleg, {}", in(reg) !0);
             medeleg::clear_supervisor_env_call();
-            medeleg::clear_machine_env_call();
             medeleg::clear_illegal_instruction();
             trap_vec::load(true);
             ROOT_STACK.prepare_for_trap();
