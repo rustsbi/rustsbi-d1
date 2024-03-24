@@ -17,8 +17,8 @@ repository.workspace = true
 sbi-testing = { git = "https://github.com/rustsbi/sbi-testing", rev = "7a5e920", features = [
     "log",
 ] }
-log = "0.4.17"
-riscv = "0.10.1"
-spin = "0.9"
+log = "0.4.21"
+riscv = "0.11.1"
+spin = "0.9.8"
 rcore-console = "0.0.0"
 hal = { path = "../hal" }

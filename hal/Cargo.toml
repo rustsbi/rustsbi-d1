@@ -12,4 +12,4 @@ repository.workspace = true
 [dependencies]
 embedded-hal = "1.0.0"
 d1-pac = "0.0.31"
-nb = "1"
+nb = "1.1.0"
