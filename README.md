@@ -189,3 +189,9 @@ no payload |                     <<                           |
 ## 换行问题
 
 如果你使用 minicom 连接开发板，出现显示时光标不回行首的情况（类似[这样](https://github.com/rustsbi/rustsbi-d1/issues/1)），需要改 minicom 配置，参考[此问答](https://unix.stackexchange.com/questions/283924/how-can-minicom-permanently-translate-incoming-newline-n-to-crlf)。
+
+## 错误提示 ERROR xtask::xfel] xfel not found
+
+xfel: https://github.com/xboot/xfel
+
+Windows配置: 下载[`xfel-windows-v1.3.2.7z`](https://github.com/xboot/xfel/releases/download/v1.3.2/xfel-windows-v1.3.2.7z)后解压，并将解压目录路径添加至系统环境变量 Path 中，于重新打开的终端中运行`xfel`命令验证成功。
